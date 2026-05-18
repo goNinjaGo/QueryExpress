@@ -1,4 +1,5 @@
 ﻿using QueryExpress.Enums;
+using System.ComponentModel;
 using System.Linq;
 using System.Linq.Expressions;
 
@@ -63,7 +64,7 @@ namespace QueryExpress
             {
                 if (Constants.DateOperations.Contains(filterData.Operation))
                 {
-                    return DateFilter(query, filterData, param, prop);
+                    return DateFilter(query, filterData, param, prop, propType);
                 }
                 else
                 {
@@ -74,7 +75,7 @@ namespace QueryExpress
             {
                 if (Constants.NumericOperations.Contains(filterData.Operation))
                 {
-                    return NumericFilter(query, filterData, param, prop);
+                    return NumericFilter(query, filterData, param, prop, propType);
                 }
                 else
                 {
@@ -106,14 +107,12 @@ namespace QueryExpress
                 Operation.NotEquals => "Equals",
                 _ => filterData.Operation.ToString()
             };
-            var method = typeof(string).GetMethod(methodName, [typeof(string)]);
+            var method = filterData.IsCaseSensitive ? typeof(string).GetMethod(methodName, [typeof(string)]) 
+                : typeof(string).GetMethod(methodName, [typeof(string), typeof(StringComparison)]);
             if (method != null)
             {
-                List<Expression> args = new List<Expression>([Expression.Constant(filterData.Value, typeof(string))]);
-                if (!filterData.IsCaseSensitive)
-                {
-                    args.Add(Expression.Constant(StringComparison.InvariantCultureIgnoreCase));
-                }
+               var args = filterData.IsCaseSensitive ? new Expression[] { Expression.Constant(filterData.Value, typeof(string)) }
+                    : [Expression.Constant(filterData.Value, typeof(string)), Expression.Constant(StringComparison.InvariantCultureIgnoreCase, typeof(StringComparison))];
 
                 var call = Expression.Call(prop, method, args);
                 var lambda = Expression.Lambda<Func<T, bool>>(call, param);
@@ -132,96 +131,75 @@ namespace QueryExpress
             }
         }
 
-        private static IQueryable<T> DateFilter<T>(this IQueryable<T> query, FilterData filterData, ParameterExpression param, MemberExpression prop)
+        private static IQueryable<T> DateFilter<T>(this IQueryable<T> query, FilterData filterData, ParameterExpression param, MemberExpression prop, Type propType)
         {
-            if (DateTime.TryParse(filterData.Value, out DateTime value))
+            var converter = TypeDescriptor.GetConverter(propType);
+            var value = converter.ConvertFromString(filterData.Value) ?? throw new ArgumentException("Value is not a valid date"); ;
+            var valueExpression = Expression.Constant(value, prop.Type);
+
+            if (filterData.Operation == Operation.Between)
             {
-                var valueExpression = Expression.Constant(value, prop.Type);
-
-                if (filterData.Operation == Operation.Between)
+                var secondaryValue = converter.ConvertFromString(filterData.SecondaryValue ?? throw new ArgumentException("Secondary value is required for Between operation.")) 
+                    ?? throw new ArgumentException($"Secondary value {filterData.SecondaryValue} is not a valid date.");
+                if ((DateTime)secondaryValue < (DateTime)value)
                 {
-                    if (DateTime.TryParse(filterData.SecondaryValue, out DateTime secondaryValue))
-                    {
-                        if (secondaryValue < value)
-                        {
-                            throw new ArgumentException($"Second value must be greater than or equal to first value for Between operation.");
-                        }
-
-                        var secondaryValueExpression = Expression.Constant(secondaryValue, prop.Type);
-                        var greaterThanOrEqual = Expression.GreaterThanOrEqual(prop, valueExpression);
-                        var lessThanOrEqual = Expression.LessThanOrEqual(prop, secondaryValueExpression);
-                        var betweenExpression = Expression.AndAlso(greaterThanOrEqual, lessThanOrEqual);
-                        var betweenLambda = Expression.Lambda<Func<T, bool>>(betweenExpression, param);
-                        return query.Where(betweenLambda);
-                    }
-                    else
-                    {
-                        throw new FormatException($"Secondary value {filterData.SecondaryValue} is not a valid date.");
-                    }
+                    throw new ArgumentException($"Second value must be greater than or equal to first value for Between operation.");
                 }
 
+                var secondaryValueExpression = Expression.Constant(secondaryValue, prop.Type);
+                var greaterThanOrEqual = Expression.GreaterThanOrEqual(prop, valueExpression);
+                var lessThanOrEqual = Expression.LessThanOrEqual(prop, secondaryValueExpression);
+                var betweenExpression = Expression.AndAlso(greaterThanOrEqual, lessThanOrEqual);
+                var betweenLambda = Expression.Lambda<Func<T, bool>>(betweenExpression, param);
+                return query.Where(betweenLambda);
+            }
 
-                BinaryExpression comparison = filterData.Operation switch
-                {
-                    Operation.Equals => Expression.Equal(prop, valueExpression),
-                    Operation.NotEquals => Expression.NotEqual(prop, valueExpression),
-                    Operation.LessThan => Expression.LessThan(prop, valueExpression),
-                    Operation.LessThanOrEqual => Expression.LessThanOrEqual(prop, valueExpression),
-                    Operation.GreaterThan => Expression.GreaterThan(prop, valueExpression),
-                    Operation.GreaterThanOrEqual => Expression.GreaterThanOrEqual(prop, valueExpression),
-                    _ => throw new InvalidOperationException($"Operation {filterData.Operation} is not valid for date type.")
-                };
-                var lambda = Expression.Lambda<Func<T, bool>>(comparison, param);
-                return query.Where(lambda);
-            }
-            else
+            BinaryExpression comparison = filterData.Operation switch
             {
-                throw new FormatException($"Value {filterData.Value} is not a valid date.");
-            }
+                Operation.Equals => Expression.Equal(prop, valueExpression),
+                Operation.NotEquals => Expression.NotEqual(prop, valueExpression),
+                Operation.LessThan => Expression.LessThan(prop, valueExpression),
+                Operation.LessThanOrEqual => Expression.LessThanOrEqual(prop, valueExpression),
+                Operation.GreaterThan => Expression.GreaterThan(prop, valueExpression),
+                Operation.GreaterThanOrEqual => Expression.GreaterThanOrEqual(prop, valueExpression),
+                _ => throw new InvalidOperationException($"Operation {filterData.Operation} is not valid for date type.")
+            };
+            var lambda = Expression.Lambda<Func<T, bool>>(comparison, param);
+            return query.Where(lambda);            
         }
 
-        private static IQueryable<T> NumericFilter<T>(this IQueryable<T> query, FilterData filterData, ParameterExpression param, MemberExpression prop)
+        private static IQueryable<T> NumericFilter<T>(this IQueryable<T> query, FilterData filterData, ParameterExpression param, MemberExpression prop, Type propType)
         {
-            if (double.TryParse(filterData.Value, out double value))
+            var converter = TypeDescriptor.GetConverter(propType);
+            var value = converter.ConvertFromString(filterData.Value) ?? throw new ArgumentException("Value is not a valid number"); ;
+            var valueExpression = Expression.Constant(value, prop.Type);
+            if (filterData.Operation == Operation.Between)
             {
-                var valueExpression = Expression.Constant(value, prop.Type);
-                if (filterData.Operation == Operation.Between)
+                var secondaryValue = converter.ConvertFromString(filterData.SecondaryValue ?? throw new ArgumentException("Secondary value is required for Between operation."))
+                    ?? throw new ArgumentException("Secondary value is not a valid number");
+                if (double.Parse(filterData.Value) > double.Parse(filterData.SecondaryValue))
                 {
-                    if (double.TryParse(filterData.SecondaryValue, out double secondaryValue))
-                    {
-                        if (secondaryValue < value)
-                        {
-                            throw new ArgumentException($"Second value must be greater than or equal to first value for Between operation.");
-                        }
-                        var secondaryValueExpression = Expression.Constant(secondaryValue, prop.Type);
-                        var greaterThanOrEqual = Expression.GreaterThanOrEqual(prop, valueExpression);
-                        var lessThanOrEqual = Expression.LessThanOrEqual(prop, secondaryValueExpression);
-                        var betweenExpression = Expression.AndAlso(greaterThanOrEqual, lessThanOrEqual);
-                        var betweenLambda = Expression.Lambda<Func<T, bool>>(betweenExpression, param);
-                        return query.Where(betweenLambda);
-                    }
-                    else
-                    {
-                        throw new FormatException($"Secondary value {filterData.SecondaryValue} is not a valid number.");
-                    }
+                    throw new ArgumentException("Second value must be greater than or equal to first value for Between operation.");
                 }
-                BinaryExpression comparison = filterData.Operation switch
-                {
-                    Operation.Equals => Expression.Equal(prop, valueExpression),
-                    Operation.NotEquals => Expression.NotEqual(prop, valueExpression),
-                    Operation.LessThan => Expression.LessThan(prop, valueExpression),
-                    Operation.LessThanOrEqual => Expression.LessThanOrEqual(prop, valueExpression),
-                    Operation.GreaterThan => Expression.GreaterThan(prop, valueExpression),
-                    Operation.GreaterThanOrEqual => Expression.GreaterThanOrEqual(prop, valueExpression),
-                    _ => throw new InvalidOperationException($"Operation {filterData.Operation} is not valid for numeric type.")
-                };
-                var lambda = Expression.Lambda<Func<T, bool>>(comparison, param);
-                return query.Where(lambda);
+                var secondaryValueExpression = Expression.Constant(secondaryValue, prop.Type);
+                var greaterThanOrEqual = Expression.GreaterThanOrEqual(prop, valueExpression);
+                var lessThanOrEqual = Expression.LessThanOrEqual(prop, secondaryValueExpression);
+                var betweenExpression = Expression.AndAlso(greaterThanOrEqual, lessThanOrEqual);
+                var betweenLambda = Expression.Lambda<Func<T, bool>>(betweenExpression, param);
+                return query.Where(betweenLambda);                
             }
-            else
+            BinaryExpression comparison = filterData.Operation switch
             {
-                throw new FormatException($"Value {filterData.Value} is not a valid number.");
-            }
+                Operation.Equals => Expression.Equal(prop, valueExpression),
+                Operation.NotEquals => Expression.NotEqual(prop, valueExpression),
+                Operation.LessThan => Expression.LessThan(prop, valueExpression),
+                Operation.LessThanOrEqual => Expression.LessThanOrEqual(prop, valueExpression),
+                Operation.GreaterThan => Expression.GreaterThan(prop, valueExpression),
+                Operation.GreaterThanOrEqual => Expression.GreaterThanOrEqual(prop, valueExpression),
+                _ => throw new InvalidOperationException($"Operation {filterData.Operation} is not valid for numeric type.")
+            };
+            var lambda = Expression.Lambda<Func<T, bool>>(comparison, param);
+            return query.Where(lambda);
         }
 
         private static IQueryable<T> BooleanFilter<T>(this IQueryable<T> query, FilterData filterData, ParameterExpression param, MemberExpression prop)
