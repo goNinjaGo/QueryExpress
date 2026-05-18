@@ -1,6 +1,6 @@
 namespace QueryExpress.Tests.Data.Models;
 
-public class Person
+public partial class Person
 {
     public int Id { get; set; }
     public string FirstName { get; set; } = string.Empty;
@@ -12,4 +12,5 @@ public class Person
     public DateTimeOffset? UpdatedAt { get; set; }
     public bool IsEligibile { get; set; }
     public bool? IsUtilized { get; set; }
+    public string? ConfidentialData { get; set; }
 }

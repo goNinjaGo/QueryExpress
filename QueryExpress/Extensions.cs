@@ -1,7 +1,9 @@
-﻿using QueryExpress.Enums;
+﻿using QueryExpress.Attributes;
+using QueryExpress.Enums;
 using System.ComponentModel;
-using System.Linq;
+using System.ComponentModel.DataAnnotations;
 using System.Linq.Expressions;
+using System.Reflection;
 
 namespace QueryExpress
 {
@@ -44,8 +46,19 @@ namespace QueryExpress
 
         public static IQueryable<T> QueryFilter<T>(this IQueryable<T> query, FilterData filterData)
         {
-            ParameterExpression param = Expression.Parameter(typeof(T));
+            var type = typeof(T);
+            ParameterExpression param = Expression.Parameter(type);
             MemberExpression prop = Expression.PropertyOrField(param, filterData.Operand);
+
+            var metadataType = type.GetCustomAttributes(typeof(MetadataTypeAttribute), true)
+                .OfType<MetadataTypeAttribute>().FirstOrDefault();
+
+            if (prop.Member.GetCustomAttribute<NonSearchableAttribute>(inherit: true) != null 
+                || metadataType?.MetadataClassType.GetProperty(filterData.Operand)?.GetCustomAttribute<NonSearchableAttribute>(inherit: true) != null)
+            {
+                throw new ArgumentException($"{filterData.Operand} is not searchable");
+            }
+
             var propType = prop.Type;
             propType = Nullable.GetUnderlyingType(propType) ?? propType;
 
@@ -134,7 +147,7 @@ namespace QueryExpress
         private static IQueryable<T> DateFilter<T>(this IQueryable<T> query, FilterData filterData, ParameterExpression param, MemberExpression prop, Type propType)
         {
             var converter = TypeDescriptor.GetConverter(propType);
-            var value = converter.ConvertFromString(filterData.Value) ?? throw new ArgumentException("Value is not a valid date"); ;
+            var value = converter.ConvertFromString(filterData.Value) ?? throw new ArgumentException("Value is not a valid date");
             var valueExpression = Expression.Constant(value, prop.Type);
 
             if (filterData.Operation == Operation.Between)

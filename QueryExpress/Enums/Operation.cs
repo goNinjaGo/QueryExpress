@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace QueryExpress.Enums
+﻿namespace QueryExpress.Enums
 {
     public enum Operation
     {
