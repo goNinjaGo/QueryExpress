@@ -9,7 +9,8 @@ namespace QueryExpress
     {
         public Operation Operation { get; set; } = Operation.Equals;
         public string Operand { get; set; } = string.Empty;
-        public string? SecondaryOperand { get; set; }
         public string Value { get; set; } = string.Empty;
+        public string? SecondaryValue { get; set; }
+        public bool IsCaseSensitive { get; set; } = false;
     }
 }

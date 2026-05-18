@@ -8,11 +8,13 @@ namespace QueryExpress.Enums
     {
         Equals, 
         NotEquals, 
+        Between,
         LessThan, 
         LessThanOrEqual, 
         GreaterThan, 
         GreaterThanOrEqual, 
         Contains, 
+        DoesNotContain,
         StartsWith, 
         EndsWith
     }
