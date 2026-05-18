@@ -80,7 +80,6 @@ namespace QueryExpress
                 {
                     throw new InvalidOperationException($"Operation {filterData.Operation} is not valid for numeric type.");
                 }
-
             }
             else if (propType == typeof(bool))
             {
@@ -244,4 +243,5 @@ namespace QueryExpress
                 throw new FormatException($"Value {filterData.Value} is not a valid boolean.");
             }
         }
+    }
 }

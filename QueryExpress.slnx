@@ -1,3 +1,5 @@
 <Solution>
+  <Project Path="QueryExpress.Tests.Data/QueryExpress.Tests.Data.csproj" />
+  <Project Path="QueryExpress.Tests/QueryExpress.Tests.csproj" />
   <Project Path="QueryExpress/QueryExpress.csproj" />
 </Solution>
