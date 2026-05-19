@@ -42,5 +42,9 @@
   <Project Path="QueryExpress.Tests.Data/QueryExpress.Tests.Data.csproj" />
   <Project Path="QueryExpress.Tests/QueryExpress.Tests.csproj" />
   <Project Path="QueryExpress.Web.Api/QueryExpress.Web.Api.csproj" Id="fd7c219c-ff9a-44bd-a4ab-5f27897daa73" />
+  <Project Path="QueryExpress.Web.React/queryexpress.web.react.esproj">
+    <Build />
+    <Deploy />
+  </Project>
   <Project Path="QueryExpress/QueryExpress.csproj" />
 </Solution>

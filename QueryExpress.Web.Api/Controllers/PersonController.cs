@@ -14,6 +14,7 @@ namespace QueryExpress.Web.Api.Controllers
     public class PersonController : ControllerBase
     {
         [HttpGet]
+        [HttpPost]
         public IEnumerable<Person> QueryPeople([FromBody] DataQuery? dataQuery)
         {
             // Use an in-memory database for demo/testing purposes
