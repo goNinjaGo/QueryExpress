@@ -1,0 +1,22 @@
+info:
+  name: QueryPage_FirstAndSecondPage
+  type: http
+  seq: 35
+
+http:
+  method: GET
+  url: https://localhost:7233/api/Person
+  body:
+    type: json
+    data: |-
+      {
+        "SortData": [ { "ColumnName": "Age", "SortDirection": "Asc" } ],
+        "PageData": { "PageNum": 1, "PageSize": 2 }
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

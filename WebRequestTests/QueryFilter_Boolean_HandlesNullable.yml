@@ -1,0 +1,23 @@
+info:
+  name: QueryFilter_Boolean_HandlesNullable
+  type: http
+  seq: 31
+
+http:
+  method: GET
+  url: https://localhost:7233/api/Person
+  body:
+    type: json
+    data: |-
+      {
+        "FilterData": [
+          { "Operation": "Equals", "Operand": "IsUtilized", "Value": "True" }
+        ]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
