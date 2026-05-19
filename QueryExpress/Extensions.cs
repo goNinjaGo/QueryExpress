@@ -9,17 +9,17 @@ namespace QueryExpress
 {
     public static class Extensions
     {
-        public static IQueryable<T> QuerySort<T>(this IQueryable<T> query, IEnumerable<(string column, SortDirection direction)> sortExpressions)
+        public static IQueryable<T> QuerySort<T>(this IQueryable<T> query, IEnumerable<SortData> sortExpressions)
         {
             ParameterExpression param = Expression.Parameter(typeof(T));
             for (int i = 0; i < sortExpressions.Count(); i++)
             {
                 var index = i;
-                MemberExpression prop = Expression.PropertyOrField(param, sortExpressions.ElementAt(index).column);
+                MemberExpression prop = Expression.PropertyOrField(param, sortExpressions.ElementAt(index).ColumnName);
                 LambdaExpression sort = Expression.Lambda(prop, param);
 
                 var functionName = index == 0 ? "OrderBy" : "ThenBy";
-                functionName = sortExpressions.ElementAt(index).direction == SortDirection.Desc ? functionName + "Descending" : functionName;
+                functionName = sortExpressions.ElementAt(index).SortDirection == SortDirection.Desc ? functionName + "Descending" : functionName;
 
                 MethodCallExpression resultExp = Expression.Call(typeof(Queryable), functionName, [typeof(T), prop.Type], query.Expression, Expression.Quote(sort));
 

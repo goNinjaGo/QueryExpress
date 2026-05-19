@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using QueryExpress.Enums;
+using QueryExpress;
 using QueryExpress.Tests.Data.Entity;
 using QueryExpress.Tests.Data.Models;
 
@@ -387,6 +388,79 @@ namespace QueryExpress.Tests
 
             var result = ctx.People.AsQueryable().QueryFilter(new FilterData { Operation = Operation.Equals, Operand = "IsUtilized", Value = "True" }).ToList();
             Assert.AreEqual(1, result.Count);
+        }
+
+        // Sort tests
+        [TestMethod]
+        public void QuerySort_ByAge_Ascending()
+        {
+            var options = CreateOptions();
+            using var ctx = new TestDataContext(options);
+            Seed(ctx);
+
+            var sorted = ctx.People.AsQueryable().QuerySort(new[] { new SortData { ColumnName = "Age", SortDirection = SortDirection.Asc } }).ToList();
+            Assert.AreEqual(3, sorted.Count);
+            Assert.AreEqual(25, sorted[0].Age); // Jane
+            Assert.AreEqual(30, sorted[1].Age); // John
+            Assert.AreEqual(40, sorted[2].Age); // Bob
+        }
+
+        [TestMethod]
+        public void QuerySort_ByLastName_Descending()
+        {
+            var options = CreateOptions();
+            using var ctx = new TestDataContext(options);
+            Seed(ctx);
+
+            var sorted = ctx.People.AsQueryable().QuerySort(new[] { new SortData { ColumnName = "LastName", SortDirection = SortDirection.Desc } }).ToList();
+            Assert.AreEqual(3, sorted.Count);
+            Assert.AreEqual("Smith", sorted[0].LastName); // Jane
+            Assert.AreEqual("Jones", sorted[1].LastName); // Bob
+            Assert.AreEqual("Doe", sorted[2].LastName); // John
+        }
+
+        [TestMethod]
+        public void QuerySort_MultipleColumns()
+        {
+            var options = CreateOptions();
+            using var ctx = new TestDataContext(options);
+            Seed(ctx);
+
+            // Sort by IsEligibile desc (true first), then Age asc
+            var sorted = ctx.People.AsQueryable().QuerySort(new[] {
+                new SortData { ColumnName = "IsEligibile", SortDirection = SortDirection.Desc },
+                new SortData { ColumnName = "Age", SortDirection = SortDirection.Asc }
+            }).ToList();
+
+            Assert.AreEqual(3, sorted.Count);
+            // First two should be eligibile = true
+            Assert.IsTrue(sorted[0].IsEligibile);
+            Assert.IsTrue(sorted[1].IsEligibile);
+            Assert.AreEqual(30, sorted[0].Age);
+            Assert.AreEqual(40, sorted[1].Age);
+            // Last should be not eligibile
+            Assert.IsFalse(sorted[2].IsEligibile);
+        }
+
+        // Paging tests
+        [TestMethod]
+        public void QueryPage_FirstAndSecondPage()
+        {
+            var options = CreateOptions();
+            using var ctx = new TestDataContext(options);
+            Seed(ctx);
+
+            // Order by Age asc then page
+            var ordered = ctx.People.AsQueryable().QuerySort(new[] { new SortData { ColumnName = "Age", SortDirection = SortDirection.Asc } });
+
+            var page1 = ordered.QueryPage(new PageData { PageNum = 1, PageSize = 2 }).ToList();
+            Assert.AreEqual(2, page1.Count);
+            Assert.AreEqual(25, page1[0].Age);
+            Assert.AreEqual(30, page1[1].Age);
+
+            var page2 = ordered.QueryPage(new PageData { PageNum = 2, PageSize = 2 }).ToList();
+            Assert.AreEqual(1, page2.Count);
+            Assert.AreEqual(40, page2[0].Age);
         }
     }
 }

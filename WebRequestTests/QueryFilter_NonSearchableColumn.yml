@@ -1,0 +1,23 @@
+info:
+  name: QueryFilter_NonSearchableColumn
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: https://localhost:7233/api/Person
+  body:
+    type: json
+    data: |-
+      {
+        "FilterData": [
+          { "Operation": "Equals", "Operand": "ConfidentialData", "Value": "Test" }
+        ]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,23 @@
+info:
+  name: QueryFilter_String_HandlesNullable
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: https://localhost:7233/api/Person
+  body:
+    type: json
+    data: |-
+      {
+        "FilterData": [
+          { "Operation": "Contains", "Operand": "Email", "Value": "example" }
+        ]
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
