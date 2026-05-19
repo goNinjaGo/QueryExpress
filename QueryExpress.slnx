@@ -1,4 +1,44 @@
 <Solution>
+  <Folder Name="/WebRequestTests/">
+    <File Path="WebRequestTests/.gitignore" />
+    <File Path="WebRequestTests/opencollection.yml" />
+    <File Path="WebRequestTests/People.yml" />
+    <File Path="WebRequestTests/QueryFilter_Boolean_Equals.yml" />
+    <File Path="WebRequestTests/QueryFilter_Boolean_HandlesNullable.yml" />
+    <File Path="WebRequestTests/QueryFilter_Boolean_NotEquals.yml" />
+    <File Path="WebRequestTests/QueryFilter_Date_Between.yml" />
+    <File Path="WebRequestTests/QueryFilter_Date_Equals.yml" />
+    <File Path="WebRequestTests/QueryFilter_Date_GreaterThan.yml" />
+    <File Path="WebRequestTests/QueryFilter_Date_GreaterThanOrEqual.yml" />
+    <File Path="WebRequestTests/QueryFilter_Date_HandlesDifferentDataTypes.yml" />
+    <File Path="WebRequestTests/QueryFilter_Date_HandlesNullable.yml" />
+    <File Path="WebRequestTests/QueryFilter_Date_LessThan.yml" />
+    <File Path="WebRequestTests/QueryFilter_Date_LessThanOrEqual.yml" />
+    <File Path="WebRequestTests/QueryFilter_Date_NotEquals.yml" />
+    <File Path="WebRequestTests/QueryFilter_NonSearchableColumn.yml" />
+    <File Path="WebRequestTests/QueryFilter_Numeric_Between.yml" />
+    <File Path="WebRequestTests/QueryFilter_Numeric_Equals.yml" />
+    <File Path="WebRequestTests/QueryFilter_Numeric_GreaterThan.yml" />
+    <File Path="WebRequestTests/QueryFilter_Numeric_GreaterThanOrEqual.yml" />
+    <File Path="WebRequestTests/QueryFilter_Numeric_HandlesDifferentDataTypes.yml" />
+    <File Path="WebRequestTests/QueryFilter_Numeric_HandlesNullable.yml" />
+    <File Path="WebRequestTests/QueryFilter_Numeric_LessThan.yml" />
+    <File Path="WebRequestTests/QueryFilter_Numeric_LessThanOrEqual.yml" />
+    <File Path="WebRequestTests/QueryFilter_Numeric_NotEquals.yml" />
+    <File Path="WebRequestTests/QueryFilter_String_Contains.yml" />
+    <File Path="WebRequestTests/QueryFilter_String_DoesNotContain.yml" />
+    <File Path="WebRequestTests/QueryFilter_String_EndsWith.yml" />
+    <File Path="WebRequestTests/QueryFilter_String_Equals.yml" />
+    <File Path="WebRequestTests/QueryFilter_String_HandlesCaseInsensitive.yml" />
+    <File Path="WebRequestTests/QueryFilter_String_HandlesCaseSensitive.yml" />
+    <File Path="WebRequestTests/QueryFilter_String_HandlesNullable.yml" />
+    <File Path="WebRequestTests/QueryFilter_String_NotEquals.yml" />
+    <File Path="WebRequestTests/QueryFilter_String_StartsWith.yml" />
+    <File Path="WebRequestTests/QueryPage_FirstAndSecondPage.yml" />
+    <File Path="WebRequestTests/QuerySort_ByAge_Ascending.yml" />
+    <File Path="WebRequestTests/QuerySort_ByLastName_Descending.yml" />
+    <File Path="WebRequestTests/QuerySort_MultipleColumns.yml" />
+  </Folder>
   <Project Path="QueryExpress.Tests.Data/QueryExpress.Tests.Data.csproj" />
   <Project Path="QueryExpress.Tests/QueryExpress.Tests.csproj" />
   <Project Path="QueryExpress.Web.Api/QueryExpress.Web.Api.csproj" Id="fd7c219c-ff9a-44bd-a4ab-5f27897daa73" />
