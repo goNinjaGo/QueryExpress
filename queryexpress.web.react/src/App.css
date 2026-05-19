@@ -11,6 +11,68 @@
   &:hover {
     border-color: var(--accent-border);
   }
+
+.app-container {
+  padding: 20px;
+}
+
+.grid-viewport {
+  max-height: 600px;
+  overflow: auto;
+  border: 1px solid var(--border, #ddd);
+  border-radius: 6px;
+}
+
+.data-grid {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+}
+
+.data-grid thead th {
+  position: sticky;
+  top: 0;
+  background: #f7f7f9;
+  padding: 8px 10px;
+  border-bottom: 1px solid #e1e1e1;
+  text-align: left;
+  vertical-align: bottom;
+}
+
+.data-grid tbody td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.filter-in-header {
+  margin-top: 6px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.filter-in-header input,
+.filter-in-header select {
+  font-size: 13px;
+  padding: 4px 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.loading-row {
+  padding: 12px;
+  text-align: center;
+  color: #666;
+}
+
+.loading-indicator {
+  margin-top: 8px;
+}
+
+.error {
+  color: #b00020;
+  margin-bottom: 8px;
+}
   &:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 2px;

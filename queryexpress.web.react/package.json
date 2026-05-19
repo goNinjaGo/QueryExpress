@@ -13,7 +13,8 @@
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "@tanstack/react-table": "^8.8.0",
-    "@tanstack/react-virtual": "^3.0.0"
+    "@tanstack/react-virtual": "^3.0.0",
+    "react-datetime-picker": "^7.0.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
