@@ -177,7 +177,7 @@ function App() {
                   return (
                     <th key={h.id}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{h.column.columnDef.header}</div>
+                        <div className="column-header-title">{h.column.columnDef.header}</div>
                         <div
                           style={{ cursor: 'pointer', marginLeft: 8 }}
                           onClick={() => {

@@ -46,6 +46,7 @@ namespace QueryExpress
 
         public static IQueryable<T> QueryFilter<T>(this IQueryable<T> query, FilterData filterData)
         {
+            if (string.IsNullOrEmpty(filterData.Value)) { return query; }
             var type = typeof(T);
             ParameterExpression param = Expression.Parameter(type);
             MemberExpression prop = Expression.PropertyOrField(param, filterData.Operand);

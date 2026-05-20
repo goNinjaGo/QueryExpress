@@ -5,23 +5,50 @@
 
 .grid-viewport {
   max-height: 600px;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: auto; /* allow horizontal scroll inside the viewport */
+  overflow-y: auto;
   border: 1px solid var(--border, #ddd);
   border-radius: 6px;
 }
 
 .data-grid {
-    border-collapse: collapse;
-    max-width: 500px;
-    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  border-collapse: collapse;
+  /* let the table size to its content so wide tables scroll inside .grid-viewport
+     keep a sensible minimum equal to the viewport width so narrow tables still fit */
+  width: max-content;
+  min-width: 100%;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
 }
 
 .data-grid thead th {
+  position: sticky;
   top: 0;
   background: #f7f7f9;
   padding: 8px 10px;
   border-bottom: 1px solid #e1e1e1;
   text-align: left;
   vertical-align: bottom;
+  white-space: nowrap; /* keep header contents on single line */
+}
+
+/* Header title styling: single line, ellipsis if too long */
+.column-header-title {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  max-width: calc(100% - 40px); /* leave room for sort icon */
+}
+
+/* Date columns: ensure the column is at least wide enough for the date picker */
+.data-grid th:nth-child(6),
+.data-grid td:nth-child(6),
+.data-grid th:nth-child(7),
+.data-grid td:nth-child(7) {
+  min-width: 240px;
 }
 
 .data-grid tbody td {
