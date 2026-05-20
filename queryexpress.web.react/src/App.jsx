@@ -6,10 +6,13 @@ import {
   getFilteredRowModel,
 } from '@tanstack/react-table'
 import { DateTimePicker } from 'react-datetime-picker'
+import { TriStateCheckbox } from 'primereact/tristatecheckbox'
 import './App.css'
 import 'react-datetime-picker/dist/DateTimePicker.css';
 import 'react-calendar/dist/Calendar.css';
 import 'react-clock/dist/Clock.css';
+import 'primereact/resources/themes/lara-dark-blue/theme.css';
+import 'primereact/resources/primereact.min.css';
 
 const PAGE_SIZE = 20
 
@@ -322,11 +325,12 @@ function renderFilterInput(type, value, onChange) {
     )
   }
   if (type === 'boolean') {
+    // TriStateCheckbox accepts true / false / null (indeterminate)
+    const normalized = value === true || value === 'true' ? true : value === false || value === 'false' ? false : null
     return (
-      <input
-        type="checkbox"
-        checked={value === true || value === 'true'}
-        onChange={(e) => onChange(e.target.checked)}
+      <TriStateCheckbox
+        value={normalized}
+        onChange={(e) => onChange(e.value + '')}
       />
     )
   }

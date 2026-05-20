@@ -6,6 +6,8 @@ namespace QueryExpress
     {
         public static int DefaultPageSize = 10;
 
+        public static string NullValue = "null";
+
         public static SortDirection DefaultSortDirection = SortDirection.Asc;
 
         public static Type[] NumericTypes = new Type[] {
