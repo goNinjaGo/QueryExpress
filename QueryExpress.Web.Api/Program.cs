@@ -1,4 +1,8 @@
 
+using Microsoft.EntityFrameworkCore;
+using QueryExpress.Tests.Data;
+using QueryExpress.Tests.Data.Entity;
+using QueryExpress.Tests.Data.Models;
 using System.Text.Json.Serialization;
 
 namespace QueryExpress.Web.Api
@@ -29,7 +33,27 @@ namespace QueryExpress.Web.Api
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
             builder.Services.AddOpenApi();
 
+            builder.Services.AddDbContext<TestDataContext>(options =>
+            {
+                options.UseInMemoryDatabase("PeopleDb");
+                options.UseSeeding((ctx, _) =>
+                {
+                    SeedData.People.ForEach(p =>
+                    {
+                        ctx.Set<Person>().Add(p);
+                    });
+                    ctx.SaveChanges();
+                });
+            });
+                
+
             var app = builder.Build();
+
+            using (var scope = app.Services.CreateScope())
+            {
+                var startupContext = scope.ServiceProvider.GetRequiredService<TestDataContext>();
+                startupContext.Database.EnsureCreated();
+            }
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())

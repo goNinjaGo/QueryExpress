@@ -13,30 +13,17 @@ namespace QueryExpress.Web.Api.Controllers
     [ApiController]
     public class PersonController : ControllerBase
     {
+        private readonly TestDataContext testDataContext;
+        public PersonController(TestDataContext testDataContext) 
+        { 
+            this.testDataContext = testDataContext;
+        }
+
         [HttpGet]
         [HttpPost]
         public IEnumerable<Person> QueryPeople([FromBody] DataQuery? dataQuery)
         {
-            // Use an in-memory database for demo/testing purposes
-            var options = new DbContextOptionsBuilder<TestDataContext>()
-                .UseInMemoryDatabase("PeopleDb")
-                .Options;
-
-            using var ctx = new TestDataContext(options);
-
-            // Seed sample data if none exists
-            if (!ctx.People.Any())
-            {
-                ctx.People.AddRange(new List<Tests.Data.Models.Person>
-                {
-                    new() { FirstName = "John", LastName = "Doe", Email = "john@example.com", Age = 30, LitersUsed = 10.5m, CreatedAt = new DateTime(2020,1,1), UpdatedAt = DateTimeOffset.UtcNow, IsEligibile = true, IsUtilized = true, ConfidentialData = "secret1" },
-                    new() { FirstName = "Jane", LastName = "Smith", Email = "jane@sample.com", Age = 25, LitersUsed = null, CreatedAt = new DateTime(2021,1,1), UpdatedAt = null, IsEligibile = false, IsUtilized = null, ConfidentialData = "secret2" },
-                    new() { FirstName = "Bob", LastName = "Jones", Email = null, Age = 40, LitersUsed = 5m, CreatedAt = new DateTime(2019,12,31), UpdatedAt = DateTimeOffset.UtcNow.AddDays(-1), IsEligibile = true, IsUtilized = false, ConfidentialData = "secret3" }
-                });
-                ctx.SaveChanges();
-            }
-
-            IQueryable<Tests.Data.Models.Person> query = ctx.People.AsQueryable();
+            IQueryable<Tests.Data.Models.Person> query = testDataContext.People.AsQueryable();
 
             if(dataQuery != null)
             {

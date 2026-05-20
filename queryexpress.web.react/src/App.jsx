@@ -7,6 +7,9 @@ import {
 } from '@tanstack/react-table'
 import { DateTimePicker } from 'react-datetime-picker'
 import './App.css'
+import 'react-datetime-picker/dist/DateTimePicker.css';
+import 'react-calendar/dist/Calendar.css';
+import 'react-clock/dist/Clock.css';
 
 const PAGE_SIZE = 20
 
@@ -156,7 +159,7 @@ function App() {
 
   return (
     <div className="app-container">
-      <h1>People (server-side)</h1>
+      <h1>People</h1>
 
       <div style={{ height: 8 }} />
 
@@ -174,7 +177,7 @@ function App() {
                   return (
                     <th key={h.id}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div style={{ fontWeight: 600 }}>{h.column.columnDef.header}</div>
+                        <div style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{h.column.columnDef.header}</div>
                         <div
                           style={{ cursor: 'pointer', marginLeft: 8 }}
                           onClick={() => {
@@ -260,7 +263,7 @@ function App() {
 
 function formatCell(item, key) {
   if (!item) return ''
-  const v = item[key] ?? item[camelToPascal(key)] ?? item[pascalToCamel(key)]
+  const v = item[key]
   if (v === null || v === undefined) return ''
   if (typeof v === 'boolean') return v ? 'Yes' : 'No'
   // format dates
@@ -274,27 +277,14 @@ function formatCell(item, key) {
   return String(v)
 }
 
-function camelToPascal(s) {
-  if (!s) return s
-  return s.charAt(0).toUpperCase() + s.slice(1)
-}
-
-function pascalToCamel(s) {
-  if (!s) return s
-  return s.charAt(0).toLowerCase() + s.slice(1)
-}
-
 export default App
 
 function defaultOpForType(type) {
   switch (type) {
-    case 'number':
-    case 'date':
-      return 'Equals'
-    case 'boolean':
-      return 'Equals'
+    case 'string':
+      return 'Contains'      
     default:
-      return 'Contains'
+      return 'Equals'
   }
 }
 
@@ -346,6 +336,7 @@ function renderFilterInput(type, value, onChange) {
       value={value ?? ''}
       onChange={(e) => onChange(e.target.value)}
       placeholder="..."
+      style={{ width: 100 }}
     />
   )
 }
