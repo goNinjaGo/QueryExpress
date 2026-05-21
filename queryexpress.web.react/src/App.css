@@ -43,14 +43,6 @@
   max-width: calc(100% - 40px); /* leave room for sort icon */
 }
 
-/* Date columns: ensure the column is at least wide enough for the date picker */
-.data-grid th:nth-child(6),
-.data-grid td:nth-child(6),
-.data-grid th:nth-child(7),
-.data-grid td:nth-child(7) {
-  min-width: 240px;
-}
-
 .data-grid tbody td {
   padding: 8px 10px;
   border-bottom: 1px solid #eee;

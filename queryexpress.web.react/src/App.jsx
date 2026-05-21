@@ -5,12 +5,9 @@ import {
   getSortedRowModel,
   getFilteredRowModel,
 } from '@tanstack/react-table'
-import { DateTimePicker } from 'react-datetime-picker'
 import { TriStateCheckbox } from 'primereact/tristatecheckbox'
+import { Calendar } from 'primereact/calendar'
 import './App.css'
-import 'react-datetime-picker/dist/DateTimePicker.css';
-import 'react-calendar/dist/Calendar.css';
-import 'react-clock/dist/Clock.css';
 import 'primereact/resources/themes/lara-dark-blue/theme.css';
 import 'primereact/resources/primereact.min.css';
 
@@ -85,18 +82,18 @@ function App() {
       // Map operation names to enum numeric values to avoid string enum mapping issues
       function opNameToEnumValue(name) {
         switch (name) {
-          case 'Equals': return 0
-          case 'NotEquals': return 1
-          case 'Between': return 2
-          case 'LessThan': return 3
-          case 'LessThanOrEqual': return 4
-          case 'GreaterThan': return 5
-          case 'GreaterThanOrEqual': return 6
-          case 'Contains': return 7
-          case 'DoesNotContain': return 8
-          case 'StartsWith': return 9
-          case 'EndsWith': return 10
-          default: return 0
+            case 'Equals': return 'Equals'
+            case 'Not Equals': return 'NotEquals'
+            case 'Between': return 'Between'
+            case '<': return 'LessThan'
+            case '<=': return 'LessThanOrEqual'
+            case '>': return 'GreaterThan'
+            case '>=': return 'GreaterThanOrEqual'
+            case 'Contains': return 'Contains'
+            case 'Does Not Contain': return 'DoesNotContain'
+            case 'Starts With': return 'StartsWith'
+            case 'Ends With': return 'EndsWith'
+            default: return 'Equals'
         }
       }
 
@@ -295,11 +292,11 @@ function operatorOptionsForType(type) {
   switch (type) {
     case 'number':
     case 'date':
-      return ['Equals', 'NotEquals', 'LessThan', 'LessThanOrEqual', 'GreaterThan', 'GreaterThanOrEqual', 'Between']
+      return ['Equals', 'Not Equals', '<', '<=', '>', '>=', 'Between']
     case 'boolean':
-      return ['Equals', 'NotEquals']
+      return ['Equals', 'Not Equals']
     default:
-      return ['Contains', 'DoesNotContain', 'StartsWith', 'EndsWith', 'Equals', 'NotEquals']
+      return ['Contains', 'Does Not Contain', 'Starts With', 'Ends With', 'Equals', 'Not Equals']
   }
 }
 
@@ -317,10 +314,11 @@ function renderFilterInput(type, value, onChange) {
   if (type === 'date') {
     const v = value ? new Date(value) : null
     return (
-      <DateTimePicker
+      <Calendar
         value={v}
-        onChange={(dt) => onChange(dt ? dt.toISOString() : '')}
-        format="MM/dd/yyyy HH:mm"
+        onChange={(dt) => onChange(dt.target.value ? dt.target.value.toISOString() : '')}
+        showTime
+        hourFormat="12"
       />
     )
   }
