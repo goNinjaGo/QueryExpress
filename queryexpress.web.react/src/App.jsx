@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
 import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  getFilteredRowModel,
+    useReactTable,
+    getCoreRowModel,
+    getSortedRowModel,
+    getFilteredRowModel,
 } from '@tanstack/react-table'
 import { TriStateCheckbox } from 'primereact/tristatecheckbox'
 import { Calendar } from 'primereact/calendar'
@@ -14,340 +14,353 @@ import 'primereact/resources/primereact.min.css';
 const PAGE_SIZE = 20
 
 function App() {
-  const [data, setData] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [pageNum, setPageNum] = useState(1)
-  const [hasMore, setHasMore] = useState(true)
+    const [data, setData] = useState([])
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState(null)
+    const [pageNum, setPageNum] = useState(1)
+    const [hasMore, setHasMore] = useState(true)
 
-  const [sorting, setSorting] = useState([]) // [{id, desc}]
-  const [filters, setFilters] = useState({}) // {columnId: value}
+    const [sorting, setSorting] = useState([]) // [{id, desc}]
+    const [filters, setFilters] = useState({}) // {columnId: value}
+    // UI input state for filters (updated on every keystroke). Applied filters are debounced into `filters`.
+    const [filterInputs, setFilterInputs] = useState({})
 
-  const tableColumns = useMemo(
-    () => [
-      { accessorKey: 'firstName', header: 'First Name', dataType: 'string' },
-      { accessorKey: 'lastName', header: 'Last Name', dataType: 'string' },
-      { accessorKey: 'email', header: 'Email', dataType: 'string' },
-      { accessorKey: 'age', header: 'Age', dataType: 'number' },
-      { accessorKey: 'litersUsed', header: 'Liters Used', dataType: 'number' },
-      { accessorKey: 'createdAt', header: 'Created At', dataType: 'date' },
-      { accessorKey: 'updatedAt', header: 'Updated At', dataType: 'date' },
-      { accessorKey: 'isEligibile', header: 'Is Eligible', dataType: 'boolean' },
-      { accessorKey: 'isUtilized', header: 'Is Utilized', dataType: 'boolean' },
-    ],
-    []
-  )
+    const tableColumns = useMemo(
+        () => [
+            { accessorKey: 'firstName', header: 'First Name', dataType: 'string' },
+            { accessorKey: 'lastName', header: 'Last Name', dataType: 'string' },
+            { accessorKey: 'email', header: 'Email', dataType: 'string' },
+            { accessorKey: 'age', header: 'Age', dataType: 'number' },
+            { accessorKey: 'litersUsed', header: 'Liters Used', dataType: 'number' },
+            { accessorKey: 'createdAt', header: 'Created At', dataType: 'date' },
+            { accessorKey: 'updatedAt', header: 'Updated At', dataType: 'date' },
+            { accessorKey: 'isEligibile', header: 'Is Eligible', dataType: 'boolean' },
+            { accessorKey: 'isUtilized', header: 'Is Utilized', dataType: 'boolean' },
+        ],
+        []
+    )
 
-  const table = useReactTable({
-    data,
-    columns: tableColumns,
-    state: { sorting },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    manualPagination: true,
-    manualSorting: true,
-    manualFiltering: true,
-    pageCount: -1,
-  })
+    const table = useReactTable({
+        data,
+        columns: tableColumns,
+        state: { sorting },
+        onSortingChange: setSorting,
+        getCoreRowModel: getCoreRowModel(),
+        getSortedRowModel: getSortedRowModel(),
+        getFilteredRowModel: getFilteredRowModel(),
+        manualPagination: true,
+        manualSorting: true,
+        manualFiltering: true,
+        pageCount: -1,
+    })
 
-  // Fetch page of data from server using DataQuery POST body
-  const fetchPage = useCallback(
-    async (pNum) => {
-      setLoading(true)
-      const filterData = []
-      for (const col of tableColumns) {
-        const key = col.accessorKey
-        const f = filters[key]
-        if (!f) continue
-        // include filter entry even if value is empty when an operator was explicitly chosen
-        filterData.push({
-          Operand: key,
-          Value: f.value ?? '',
-          SecondaryValue: f.secondaryValue ?? null,
-          Operation: f.op ?? defaultOpForType(col.dataType),
-          IsCaseSensitive: f.isCaseSensitive ?? false,
-        })
-      }
-
-      const dq = {
-        PageData: { PageNum: pNum, PageSize: PAGE_SIZE },
-        SortData: (sorting || []).map((s) => ({ ColumnName: s.id, SortDirection: s.desc ? 'Desc' : 'Asc' })),
-        FilterData: filterData,
-      }
-
-      // Debug the outgoing DataQuery
-      console.debug('Sending DataQuery:', dq)
-      // Map operation names to enum numeric values to avoid string enum mapping issues
-      function opNameToEnumValue(name) {
-        switch (name) {
-            case 'Equals': return 'Equals'
-            case 'Not Equals': return 'NotEquals'
-            case 'Between': return 'Between'
-            case '<': return 'LessThan'
-            case '<=': return 'LessThanOrEqual'
-            case '>': return 'GreaterThan'
-            case '>=': return 'GreaterThanOrEqual'
-            case 'Contains': return 'Contains'
-            case 'Does Not Contain': return 'DoesNotContain'
-            case 'Starts With': return 'StartsWith'
-            case 'Ends With': return 'EndsWith'
-            default: return 'Equals'
-        }
-      }
-
-      // convert Operation strings to numeric enum values for reliable deserialization
-      dq.FilterData = dq.FilterData.map(fd => ({
-        ...fd,
-        Operation: opNameToEnumValue(fd.Operation)
-      }))
-
-      try {
-          const res = await fetch('https://localhost:7233/api/person', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(dq),
-        })
-        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-        const items = await res.json()
-
-        if (pNum === 1) setData(items)
-        else {
-          // deduplicate by simple key combination to avoid repeats
-          setData((prev) => {
-            const combined = [...prev, ...items]
-            const seen = new Set()
-            const dedup = []
-            for (const it of combined) {
-              const key = `${it.firstName ?? it.FirstName ?? ''}|${it.lastName ?? it.LastName ?? ''}|${it.email ?? it.Email ?? ''}|${it.age ?? it.Age ?? ''}`
-              if (!seen.has(key)) {
-                seen.add(key)
-                dedup.push(it)
-              }
+    // Fetch page of data from server using DataQuery POST body
+    const fetchPage = useCallback(
+        async (pNum) => {
+            setLoading(true)
+            const filterData = []
+            for (const col of tableColumns) {
+                const key = col.accessorKey
+                const f = filters[key]
+                if (!f) continue
+                // include filter entry even if value is empty when an operator was explicitly chosen
+                filterData.push({
+                    Operand: key,
+                    Value: f.value ?? '',
+                    SecondaryValue: f.secondaryValue ?? null,
+                    Operation: f.op ?? defaultOpForType(col.dataType),
+                    IsCaseSensitive: f.isCaseSensitive ?? false,
+                })
             }
-            return dedup
-          })
-        }
 
-        setHasMore(items.length >= PAGE_SIZE)
-        setError(null)
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
-      }
-    },
-    [sorting, filters]
-  )
+            const dq = {
+                PageData: { PageNum: pNum, PageSize: PAGE_SIZE },
+                SortData: (sorting || []).map((s) => ({ ColumnName: s.id, SortDirection: s.desc ? 'Desc' : 'Asc' })),
+                FilterData: filterData,
+            }
 
-  // Reset and fetch when sorting or filters change
-  useEffect(() => {
-    setPageNum(1)
-    setData([])
-    setHasMore(true)
-    fetchPage(1)
-  }, [sorting, filters, fetchPage])
+            // Debug the outgoing DataQuery
+            console.debug('Sending DataQuery:', dq)
+            // Map operation names to enum numeric values to avoid string enum mapping issues
+            function opNameToEnumValue(name) {
+                switch (name) {
+                    case 'Equals': return 'Equals'
+                    case 'Not Equals': return 'NotEquals'
+                    case 'Between': return 'Between'
+                    case '<': return 'LessThan'
+                    case '<=': return 'LessThanOrEqual'
+                    case '>': return 'GreaterThan'
+                    case '>=': return 'GreaterThanOrEqual'
+                    case 'Contains': return 'Contains'
+                    case 'Does Not Contain': return 'DoesNotContain'
+                    case 'Starts With': return 'StartsWith'
+                    case 'Ends With': return 'EndsWith'
+                    default: return 'Equals'
+                }
+            }
 
-  useEffect(() => {
-    if (pageNum === 1) return
-    fetchPage(pageNum)
-  }, [pageNum, fetchPage])
+            // convert Operation strings to numeric enum values for reliable deserialization
+            dq.FilterData = dq.FilterData.map(fd => ({
+                ...fd,
+                Operation: opNameToEnumValue(fd.Operation)
+            }))
 
-  // Virtualization for infinite scroll
-  // infinite scroll handled by pageNum increments; rendering without virtualization for correct alignment
+            try {
+                const res = await fetch('https://localhost:7233/api/person', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dq),
+                })
+                if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+                const items = await res.json()
 
-  return (
-    <div className="app-container">
-      <h1>People</h1>
+                if (pNum === 1) setData(items)
+                else {
+                    // deduplicate by simple key combination to avoid repeats
+                    setData((prev) => {
+                        const combined = [...prev, ...items]
+                        const seen = new Set()
+                        const dedup = []
+                        for (const it of combined) {
+                            const key = `${it.firstName ?? it.FirstName ?? ''}|${it.lastName ?? it.LastName ?? ''}|${it.email ?? it.Email ?? ''}|${it.age ?? it.Age ?? ''}`
+                            if (!seen.has(key)) {
+                                seen.add(key)
+                                dedup.push(it)
+                            }
+                        }
+                        return dedup
+                    })
+                }
 
-      <div style={{ height: 8 }} />
+                setHasMore(items.length >= PAGE_SIZE)
+                setError(null)
+            } catch (err) {
+                setError(err.message)
+            } finally {
+                setLoading(false)
+            }
+        },
+        [sorting, filters]
+    )
 
-      {error && <div className="error">Error: {error}</div>}
+    // Reset and fetch when sorting or filters change
+    useEffect(() => {
+        setPageNum(1)
+        setData([])
+        setHasMore(true)
+        fetchPage(1)
+    }, [sorting, filters, fetchPage])
 
-      <div className="grid-viewport">
-        <table className="data-grid">
-          <thead>
-            {table.getHeaderGroups().map((hg) => (
-              <tr key={hg.id}>
-                {hg.headers.map((h) => {
-                  const colId = h.column.id
-                  const colDef = tableColumns.find((c) => c.accessorKey === colId) || {}
-                  const f = filters[colId] || { op: defaultOpForType(colDef.dataType), value: '', secondaryValue: '' }
-                  return (
-                    <th key={h.id}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div className="column-header-title">{h.column.columnDef.header}</div>
-                        <div
-                          style={{ cursor: 'pointer', marginLeft: 8 }}
-                          onClick={() => {
-                            const id = colId
-                            const current = sorting.find((s) => s.id === id)
-                            if (!current) setSorting([{ id, desc: false }])
-                            else if (!current.desc) setSorting([{ id, desc: true }])
-                            else setSorting([])
-                          }}
-                        >
-                          {sorting.find((s) => s.id === h.column.id)
-                            ? sorting.find((s) => s.id === h.column.id).desc
-                              ? ' 🔽'
-                              : ' 🔼'
-                            : ' ⇅'}
-                        </div>
-                      </div>
-                      <div className="filter-in-header">
-                        <select
-                          value={f.op}
-                          onChange={(e) =>
-                            setFilters((fs) => ({ ...fs, [colId]: { ...(fs[colId] || {}), op: e.target.value } }))
-                          }
-                        >
-                          {operatorOptionsForType(colDef.dataType).map((op) => (
-                            <option key={op} value={op}>
-                              {op}
-                            </option>
-                          ))}
-                        </select>
-                        {f.op === 'Between' ? (
-                          <>
-                            {renderFilterInput(colDef.dataType, f.value ?? '', (val) =>
-                              setFilters((fs) => ({ ...fs, [colId]: { ...(fs[colId] || {}), value: val } }))
-                            )}
-                            {renderFilterInput(colDef.dataType, f.secondaryValue ?? '', (val) =>
-                              setFilters((fs) => ({ ...fs, [colId]: { ...(fs[colId] || {}), secondaryValue: val } }))
-                            )}
-                          </>
-                        ) : (
-                          renderFilterInput(colDef.dataType, f.value ?? '', (val) =>
-                            setFilters((fs) => ({ ...fs, [colId]: { ...(fs[colId] || {}), value: val } }))
-                          )
+    // Apply UI inputs to the actual filters with a debounce so requests aren't made on every keystroke
+    useEffect(() => {
+        const t = setTimeout(() => {
+            setFilters(filterInputs)
+        }, 300)
+        return () => clearTimeout(t)
+    }, [filterInputs])
+
+    useEffect(() => {
+        if (pageNum === 1) return
+        fetchPage(pageNum)
+    }, [pageNum, fetchPage])
+
+    // Virtualization for infinite scroll
+    // infinite scroll handled by pageNum increments; rendering without virtualization for correct alignment
+
+    return (
+        <div className="app-container">
+            <h1>People</h1>
+
+            <div style={{ height: 8 }} />
+
+            {error && <div className="error">Error: {error}</div>}
+
+            <div className="grid-viewport">
+                <table className="data-grid">
+                    <thead>
+                        {table.getHeaderGroups().map((hg) => (
+                            <tr key={hg.id}>
+                                {hg.headers.map((h) => {
+                                    const colId = h.column.id
+                                    const colDef = tableColumns.find((c) => c.accessorKey === colId) || {}
+                                    const inputState = (filterInputs[colId] ?? filters[colId]) || { op: defaultOpForType(colDef.dataType), value: '', secondaryValue: '' }
+                                    return (
+                                        <th key={h.id}>
+                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <div className="column-header-title">{h.column.columnDef.header}</div>
+                                                <div
+                                                    style={{ cursor: 'pointer', marginLeft: 8 }}
+                                                    onClick={() => {
+                                                        const id = colId
+                                                        const current = sorting.find((s) => s.id === id)
+                                                        if (!current) setSorting([{ id, desc: false }])
+                                                        else if (!current.desc) setSorting([{ id, desc: true }])
+                                                        else setSorting([])
+                                                    }}
+                                                >
+                                                    {sorting.find((s) => s.id === h.column.id)
+                                                        ? sorting.find((s) => s.id === h.column.id).desc
+                                                            ? ' 🔽'
+                                                            : ' 🔼'
+                                                        : ' ⇅'}
+                                                </div>
+                                            </div>
+                                            <div className="filter-in-header">
+                                                <select
+                                                    value={inputState.op}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value
+                                                        setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), op: val } }))
+                                                        setFilters((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), op: val } }))
+                                                    }}
+                                                >
+                                                    {operatorOptionsForType(colDef.dataType).map((op) => (
+                                                        <option key={op} value={op}>
+                                                            {op}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                {inputState.op === 'Between' ? (
+                                                    <>
+                                                        {renderFilterInput(colDef.dataType, inputState.value ?? '', (val) =>
+                                                            setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), value: val } }))
+                                                        )}
+                                                        {renderFilterInput(colDef.dataType, inputState.secondaryValue ?? '', (val) =>
+                                                            setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), secondaryValue: val } }))
+                                                        )}
+                                                    </>
+                                                ) : (
+                                                    renderFilterInput(colDef.dataType, inputState.value ?? '', (val) =>
+                                                        setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), value: val } }))
+                                                    )
+                                                )}
+                                            </div>
+                                        </th>
+                                    )
+                                })}
+                            </tr>
+                        ))}
+                    </thead>
+
+                    <tbody>
+                        {data.map((item, idx) => (
+                            <tr key={idx}>
+                                {tableColumns.map((c) => (
+                                    <td key={c.accessorKey}>{formatCell(item, c.accessorKey)}</td>
+                                ))}
+                            </tr>
+                        ))}
+                        {loading && (
+                            <tr>
+                                <td colSpan={tableColumns.length} className="loading-row">
+                                    Loading...
+                                </td>
+                            </tr>
                         )}
-                      </div>
-                    </th>
-                  )
-                })}
-              </tr>
-            ))}
-          </thead>
+                        {!loading && !hasMore && data.length === 0 && (
+                            <tr>
+                                <td colSpan={tableColumns.length} className="loading-row">
+                                    No results
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
 
-          <tbody>
-            {data.map((item, idx) => (
-              <tr key={idx}>
-                {tableColumns.map((c) => (
-                  <td key={c.accessorKey}>{formatCell(item, c.accessorKey)}</td>
-                ))}
-              </tr>
-            ))}
-            {loading && (
-              <tr>
-                <td colSpan={tableColumns.length} className="loading-row">
-                  Loading...
-                </td>
-              </tr>
-            )}
-            {!loading && !hasMore && data.length === 0 && (
-              <tr>
-                <td colSpan={tableColumns.length} className="loading-row">
-                  No results
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {loading && <div className="loading-indicator">Loading...</div>}
-    </div>
-  )
+            {loading && <div className="loading-indicator">Loading...</div>}
+        </div>
+    )
 }
 
 function formatCell(item, key) {
-  if (!item) return ''
-  const v = item[key]
-  if (v === null || v === undefined) return ''
-  if (typeof v === 'boolean') return v ? 'Yes' : 'No'
-  // format dates
-  const dateKeys = ['createdAt', 'CreatedAt', 'updatedAt', 'UpdatedAt']
-  if (dateKeys.includes(key) || /^[0-9]{4}-[0-9]{2}-[0-9]{2}T/.test(String(v))) {
-    const d = new Date(v)
-    if (!isNaN(d.getTime())) {
-      return formatDateMMDD(d)
+    if (!item) return ''
+    const v = item[key]
+    if (v === null || v === undefined) return ''
+    if (typeof v === 'boolean') return v ? 'Yes' : 'No'
+    // format dates
+    const dateKeys = ['createdAt', 'CreatedAt', 'updatedAt', 'UpdatedAt']
+    if (dateKeys.includes(key) || /^[0-9]{4}-[0-9]{2}-[0-9]{2}T/.test(String(v))) {
+        const d = new Date(v)
+        if (!isNaN(d.getTime())) {
+            return formatDateMMDD(d)
+        }
     }
-  }
-  return String(v)
+    return String(v)
 }
 
 export default App
 
 function defaultOpForType(type) {
-  switch (type) {
-    case 'string':
-      return 'Contains'      
-    default:
-      return 'Equals'
-  }
+    switch (type) {
+        case 'string':
+            return 'Contains'
+        default:
+            return 'Equals'
+    }
 }
 
 function operatorOptionsForType(type) {
-  switch (type) {
-    case 'number':
-    case 'date':
-      return ['Equals', 'Not Equals', '<', '<=', '>', '>=', 'Between']
-    case 'boolean':
-      return ['Equals', 'Not Equals']
-    default:
-      return ['Contains', 'Does Not Contain', 'Starts With', 'Ends With', 'Equals', 'Not Equals']
-  }
+    switch (type) {
+        case 'number':
+        case 'date':
+            return ['Equals', 'Not Equals', '<', '<=', '>', '>=', 'Between']
+        case 'boolean':
+            return ['Equals', 'Not Equals']
+        default:
+            return ['Contains', 'Does Not Contain', 'Starts With', 'Ends With', 'Equals', 'Not Equals']
+    }
 }
 
 function renderFilterInput(type, value, onChange) {
-  if (type === 'number') {
-    return (
-      <input
-        type="number"
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value)}
-        style={{ width: 100 }}
-      />
-    )
-  }
-  if (type === 'date') {
-    const v = value ? new Date(value) : null
-    return (
-      <Calendar
-        value={v}
-        onChange={(dt) => onChange(dt.target.value ? dt.target.value.toISOString() : '')}
-        showTime
-        hourFormat="12"
-      />
-    )
-  }
-  if (type === 'boolean') {
-    // TriStateCheckbox accepts true / false / null (indeterminate)
-    const normalized = value === true || value === 'true' ? true : value === false || value === 'false' ? false : null
-    return (
-      <TriStateCheckbox
-        value={normalized}
-        onChange={(e) => onChange(e.value + '')}
-      />
-    )
-  }
+    if (type === 'number') {
+        return (
+            <input
+                type="number"
+                value={value ?? ''}
+                onChange={(e) => onChange(e.target.value)}
+                style={{ width: 100 }}
+            />
+        )
+    }
+    if (type === 'date') {
+        const v = value ? new Date(value) : null
+        return (
+            <Calendar
+                value={v}
+                onChange={(e) => onChange(e.value ? e.value.toISOString() : '')}
+                showTime
+                hourFormat="12"
+            />
+        )
+    }
+    if (type === 'boolean') {
+        // TriStateCheckbox accepts true / false / null (indeterminate)
+        const normalized = value === true || value === 'true' ? true : value === false || value === 'false' ? false : null
+        return (
+            <TriStateCheckbox
+                value={normalized}
+                onChange={(e) => onChange(e.value + '')}
+            />
+        )
+    }
 
-  return (
-    <input
-      value={value ?? ''}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder="..."
-      style={{ width: 100 }}
-    />
-  )
+    return (
+        <input
+            value={value ?? ''}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="..."
+            style={{ width: 100 }}
+        />
+    )
 }
 
 function formatDateMMDD(d) {
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  const yyyy = d.getFullYear()
-  const hh = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  return `${mm}/${dd}/${yyyy} ${hh}:${min}`
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    const yyyy = d.getFullYear()
+    const hh = String(d.getHours()).padStart(2, '0')
+    const min = String(d.getMinutes()).padStart(2, '0')
+    return `${mm}/${dd}/${yyyy} ${hh}:${min}`
 }
+
