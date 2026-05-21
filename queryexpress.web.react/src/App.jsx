@@ -12,6 +12,7 @@ import 'primereact/resources/themes/lara-dark-blue/theme.css';
 import 'primereact/resources/primereact.min.css';
 
 const PAGE_SIZE = 20
+const API_URL = 'https://localhost:7233/api/person'
 
 function App() {
     const [data, setData] = useState([])
@@ -79,9 +80,6 @@ function App() {
                 FilterData: filterData,
             }
 
-            // Debug the outgoing DataQuery
-            console.debug('Sending DataQuery:', dq)
-            // Map operation names to enum numeric values to avoid string enum mapping issues
             function opNameToEnumValue(name) {
                 switch (name) {
                     case 'Equals': return 'Equals'
@@ -99,14 +97,13 @@ function App() {
                 }
             }
 
-            // convert Operation strings to numeric enum values for reliable deserialization
             dq.FilterData = dq.FilterData.map(fd => ({
                 ...fd,
                 Operation: opNameToEnumValue(fd.Operation)
             }))
 
             try {
-                const res = await fetch('https://localhost:7233/api/person', {
+                const res = await fetch(API_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(dq),
@@ -221,14 +218,36 @@ function App() {
                                                     ))}
                                                 </select>
                                                 {inputState.op === 'Between' ? (
-                                                    <>
-                                                        {renderFilterInput(colDef.dataType, inputState.value ?? '', (val) =>
-                                                            setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), value: val } }))
-                                                        )}
-                                                        {renderFilterInput(colDef.dataType, inputState.secondaryValue ?? '', (val) =>
-                                                            setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), secondaryValue: val } }))
-                                                        )}
-                                                    </>
+                                                    colDef.dataType === 'date' ? (
+                                                        // For date-between use a single range calendar
+                                                            <Calendar
+                                                                value={(() => {
+                                                                    const v = []
+                                                                    if (inputState.value) v.push(new Date(inputState.value))
+                                                                    if (inputState.secondaryValue) v.push(new Date(inputState.secondaryValue))
+                                                                    return v.length ? v : null
+                                                                })()}
+                                                            selectionMode="range"
+                                                            onChange={(e) => {
+                                                                const vals = e.value || []
+                                                                const start = vals[0] ? vals[0].toISOString() : ''
+                                                                const end = vals[1] ? vals[1].toISOString() : ''
+                                                                setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), value: start, secondaryValue: end } }))
+                                                            }}
+                                                            showTime
+                                                            hourFormat="12"
+                                                            appendTo={document.body}
+                                                        />
+                                                    ) : (
+                                                        <>
+                                                            {renderFilterInput(colDef.dataType, inputState.value ?? '', (val) =>
+                                                                setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), value: val } }))
+                                                            )}
+                                                            {renderFilterInput(colDef.dataType, inputState.secondaryValue ?? '', (val) =>
+                                                                setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), secondaryValue: val } }))
+                                                            )}
+                                                        </>
+                                                    )
                                                 ) : (
                                                     renderFilterInput(colDef.dataType, inputState.value ?? '', (val) =>
                                                         setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), value: val } }))
@@ -331,6 +350,7 @@ function renderFilterInput(type, value, onChange) {
                 onChange={(e) => onChange(e.value ? e.value.toISOString() : '')}
                 showTime
                 hourFormat="12"
+                appendTo={document.body}
             />
         )
     }
