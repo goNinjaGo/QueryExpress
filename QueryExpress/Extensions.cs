@@ -46,7 +46,11 @@ namespace QueryExpress
 
         public static IQueryable<T> QueryFilter<T>(this IQueryable<T> query, FilterData filterData)
         {
-            if (string.IsNullOrEmpty(filterData.Value) || filterData.Value == Constants.NullValue) { return query; }
+            if (string.IsNullOrEmpty(filterData.Value) || filterData.Value == Constants.NullValue 
+                || (filterData.Operation == Operation.Between && (string.IsNullOrEmpty(filterData.SecondaryValue) || filterData.SecondaryValue == Constants.NullValue))) 
+            { 
+                return query; 
+            }
             var type = typeof(T);
             ParameterExpression param = Expression.Parameter(type);
             MemberExpression prop = Expression.PropertyOrField(param, filterData.Operand);
@@ -148,16 +152,19 @@ namespace QueryExpress
         private static IQueryable<T> DateFilter<T>(this IQueryable<T> query, FilterData filterData, ParameterExpression param, MemberExpression prop, Type propType)
         {
             var converter = TypeDescriptor.GetConverter(propType);
-            var value = converter.ConvertFromString(filterData.Value) ?? throw new ArgumentException("Value is not a valid date");
+            var value = converter.ConvertFromString(filterData.Value);
+            if(value == null)
+            {
+                return query;
+            }
             var valueExpression = Expression.Constant(value, prop.Type);
 
             if (filterData.Operation == Operation.Between)
             {
-                var secondaryValue = converter.ConvertFromString(filterData.SecondaryValue ?? throw new ArgumentException("Secondary value is required for Between operation.")) 
-                    ?? throw new ArgumentException($"Secondary value {filterData.SecondaryValue} is not a valid date.");
-                if ((DateTime)secondaryValue < (DateTime)value)
+                var secondaryValue = converter.ConvertFromString(filterData.SecondaryValue!);
+                if (secondaryValue == null || (DateTime)secondaryValue < (DateTime)value)
                 {
-                    throw new ArgumentException($"Second value must be greater than or equal to first value for Between operation.");
+                    return query;
                 }
 
                 var secondaryValueExpression = Expression.Constant(secondaryValue, prop.Type);
@@ -189,11 +196,10 @@ namespace QueryExpress
             var valueExpression = Expression.Constant(value, prop.Type);
             if (filterData.Operation == Operation.Between)
             {
-                var secondaryValue = converter.ConvertFromString(filterData.SecondaryValue ?? throw new ArgumentException("Secondary value is required for Between operation."))
-                    ?? throw new ArgumentException("Secondary value is not a valid number");
-                if (double.Parse(filterData.Value) > double.Parse(filterData.SecondaryValue))
+                var secondaryValue = converter.ConvertFromString(filterData.SecondaryValue!);
+                if (secondaryValue == null || double.Parse(filterData.Value) > double.Parse(filterData.SecondaryValue!))
                 {
-                    throw new ArgumentException("Second value must be greater than or equal to first value for Between operation.");
+                    return query;
                 }
                 var secondaryValueExpression = Expression.Constant(secondaryValue, prop.Type);
                 var greaterThanOrEqual = Expression.GreaterThanOrEqual(prop, valueExpression);
@@ -232,7 +238,7 @@ namespace QueryExpress
             }
             else
             {
-                throw new FormatException($"Value {filterData.Value} is not a valid boolean.");
+                return query;
             }
         }
     }
