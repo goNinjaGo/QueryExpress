@@ -164,6 +164,25 @@ function App() {
     // Virtualization for infinite scroll
     // infinite scroll handled by pageNum increments; rendering without virtualization for correct alignment
 
+    // Position an appended calendar overlay so it appears directly below the input
+    const positionCalendarOverlay = (colId) => {
+        try {
+            const input = document.getElementById(`calendar-input-${colId}`)
+            const panel = document.querySelector(`.calendar-overlay-${colId}`)
+            if (!input || !panel) return
+            const rect = input.getBoundingClientRect()
+            panel.style.position = 'absolute'
+            panel.style.left = `${rect.left + window.scrollX}px`
+            panel.style.top = `${rect.bottom + window.scrollY}px`
+            // ensure it appears above other content
+            panel.style.zIndex = '1000'
+            // match width to input for a cleaner look
+            if (panel.style.minWidth === '') panel.style.minWidth = `${rect.width}px`
+        } catch (e) {
+            // ignore positioning errors
+        }
+    }
+
     return (
         <div className="app-container">
             <h1>People</h1>
@@ -220,13 +239,13 @@ function App() {
                                                 {inputState.op === 'Between' ? (
                                                     colDef.dataType === 'date' ? (
                                                         // For date-between use a single range calendar
-                                                            <Calendar
-                                                                value={(() => {
-                                                                    const v = []
-                                                                    if (inputState.value) v.push(new Date(inputState.value))
-                                                                    if (inputState.secondaryValue) v.push(new Date(inputState.secondaryValue))
-                                                                    return v.length ? v : null
-                                                                })()}
+                                                        <Calendar
+                                                            value={(() => {
+                                                                const v = []
+                                                                if (inputState.value) v.push(new Date(inputState.value))
+                                                                if (inputState.secondaryValue) v.push(new Date(inputState.secondaryValue))
+                                                                return v.length ? v : null
+                                                            })()}
                                                             selectionMode="range"
                                                             onChange={(e) => {
                                                                 const vals = e.value || []
@@ -237,20 +256,23 @@ function App() {
                                                             showTime
                                                             hourFormat="12"
                                                             appendTo={document.body}
+                                                                    inputId={colId ? `calendar-input-${colId}` : undefined}
+                                                                    panelClassName={colId ? `calendar-overlay-${colId}` : undefined}
+                                                                    onShow={() => colId && positionCalendarOverlay && positionCalendarOverlay(colId)}
                                                         />
                                                     ) : (
                                                         <>
                                                             {renderFilterInput(colDef.dataType, inputState.value ?? '', (val) =>
-                                                                setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), value: val } }))
+                                                                setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), value: val } })), colId, positionCalendarOverlay
                                                             )}
                                                             {renderFilterInput(colDef.dataType, inputState.secondaryValue ?? '', (val) =>
-                                                                setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), secondaryValue: val } }))
+                                                                setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), secondaryValue: val } })), colId, positionCalendarOverlay
                                                             )}
                                                         </>
                                                     )
                                                 ) : (
                                                     renderFilterInput(colDef.dataType, inputState.value ?? '', (val) =>
-                                                        setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), value: val } }))
+                                                        setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), value: val } })), colId, positionCalendarOverlay
                                                     )
                                                 )}
                                             </div>
@@ -331,7 +353,7 @@ function operatorOptionsForType(type) {
     }
 }
 
-function renderFilterInput(type, value, onChange) {
+function renderFilterInput(type, value, onChange, colId, positionCalendarOverlay) {
     if (type === 'number') {
         return (
             <input
@@ -351,6 +373,9 @@ function renderFilterInput(type, value, onChange) {
                 showTime
                 hourFormat="12"
                 appendTo={document.body}
+                inputId={colId ? `calendar-input-${colId}` : undefined}
+                panelClassName={colId ? `calendar-overlay-${colId}` : undefined}
+                onShow={() => colId && positionCalendarOverlay && positionCalendarOverlay(colId)}
             />
         )
     }
