@@ -1,8 +1,10 @@
 
+using CsvHelper;
 using Microsoft.EntityFrameworkCore;
 using QueryExpress.Tests.Data;
 using QueryExpress.Tests.Data.Entity;
 using QueryExpress.Tests.Data.Models;
+using System.Globalization;
 using System.Text.Json.Serialization;
 
 namespace QueryExpress.Web.Api
@@ -38,7 +40,7 @@ namespace QueryExpress.Web.Api
                 options.UseInMemoryDatabase("PeopleDb");
                 options.UseSeeding((ctx, _) =>
                 {
-                    SeedData.People.ForEach(p =>
+                    SeedDataFromCsv().ForEach(p =>
                     {
                         ctx.Set<Person>().Add(p);
                     });
@@ -70,6 +72,16 @@ namespace QueryExpress.Web.Api
             app.MapControllers();
 
             app.Run();
+        }
+
+        public static List<Person> SeedDataFromCsv()
+        {
+            using (var reader = new StreamReader($"{Environment.CurrentDirectory}\\People.csv"))
+            using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
+            {
+                var records = csv.GetRecords<Person>();
+                return records.ToList();
+            }
         }
     }
 }

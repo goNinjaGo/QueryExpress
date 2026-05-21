@@ -109,27 +109,9 @@ function App() {
                     body: JSON.stringify(dq),
                 })
                 if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-                const items = await res.json()
+                const items = await res.json()                
+                setData(items)
 
-                if (pNum === 1) setData(items)
-                else {
-                    // deduplicate by simple key combination to avoid repeats
-                    setData((prev) => {
-                        const combined = [...prev, ...items]
-                        const seen = new Set()
-                        const dedup = []
-                        for (const it of combined) {
-                            const key = `${it.firstName ?? it.FirstName ?? ''}|${it.lastName ?? it.LastName ?? ''}|${it.email ?? it.Email ?? ''}|${it.age ?? it.Age ?? ''}`
-                            if (!seen.has(key)) {
-                                seen.add(key)
-                                dedup.push(it)
-                            }
-                        }
-                        return dedup
-                    })
-                }
-
-                setHasMore(items.length >= PAGE_SIZE)
                 setError(null)
             } catch (err) {
                 setError(err.message)
@@ -161,8 +143,6 @@ function App() {
         fetchPage(pageNum)
     }, [pageNum, fetchPage])
 
-    // Virtualization for infinite scroll
-    // infinite scroll handled by pageNum increments; rendering without virtualization for correct alignment
 
     // Position an appended calendar overlay so it appears directly below the input
     const positionCalendarOverlay = (colId) => {
@@ -174,11 +154,7 @@ function App() {
             panel.style.position = 'absolute'
             panel.style.left = `${rect.left + window.scrollX}px`
             panel.style.top = `${rect.bottom + window.scrollY}px`
-            // ensure it appears above other content
-            panel.style.zIndex = '1000'
-            // match width to input for a cleaner look
-            if (panel.style.minWidth === '') panel.style.minWidth = `${rect.width}px`
-        } catch (e) {
+        } catch {
             // ignore positioning errors
         }
     }
