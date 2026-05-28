@@ -41,3 +41,9 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+.data-grid .p-datatable-tbody > tr > td {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    white-space: nowrap;
+}

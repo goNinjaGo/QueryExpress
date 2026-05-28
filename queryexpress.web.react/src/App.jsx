@@ -388,7 +388,7 @@ function App() {
                     virtualScrollerOptions={{
                         lazy: true,
                         onLazyLoad: onVirtualScroll,
-                        itemSize: 100,
+                        itemSize: 35,
                         delay: 150,
                         showLoader: false
                     }}
