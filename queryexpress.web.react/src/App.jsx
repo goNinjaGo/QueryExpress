@@ -14,7 +14,6 @@ const API_URL = 'https://localhost:7233/api/person'
 const DEBOUNCE_DELAY = 300
 const getPageFirst = (first = 0, pageSize = PAGE_SIZE) => Math.floor(first / pageSize) * pageSize
 const booleanFilterOptions = [
-    { label: 'All', value: '' },
     { label: 'Yes', value: 'true' },
     { label: 'No', value: 'false' },
 ]
@@ -93,24 +92,8 @@ function App() {
                     },
                 ],
             },
-            isEligibile: {
-                operator: FilterOperator.AND,
-                constraints: [
-                    {
-                        value: null,
-                        matchMode: FilterMatchMode.EQUALS,
-                    },
-                ],
-            },
-            isUtilized: {
-                operator: FilterOperator.AND,
-                constraints: [
-                    {
-                        value: null,
-                        matchMode: FilterMatchMode.EQUALS,
-                    },
-                ],
-            },
+            isEligibile: {value: null, matchMode: FilterMatchMode.EQUALS },
+            isUtilized:  { value: null, matchMode: FilterMatchMode.EQUALS },
         },
     });
 
@@ -141,16 +124,30 @@ function App() {
             Object.entries(filters || {}).forEach(([key, f]) => {
                 if (!f) return;
 
-                for (const constraint of f.constraints) {
-                    const value = normalizeFilterValue(constraint.value);
-                    if (value === null) continue;
-
+                if (f.matchMode !== undefined) {
+                    const value = normalizeFilterValue(f.value);
+                    if (value === null) {
+                        return;
+                    };
                     filterData.push({
                         Operand: key,
                         Value: value,
-                        Operation: opNameToEnumValue(constraint.matchMode ?? 'contains'),
+                        Operation: opNameToEnumValue(f.matchMode ?? 'equals'),
                     });
                 }
+                else {
+                    for (const constraint of f.constraints) {
+                        const value = normalizeFilterValue(constraint.value);
+                        if (value === null) {
+                            continue;
+                        }
+                        filterData.push({
+                            Operand: key,
+                            Value: value,
+                            Operation: opNameToEnumValue(constraint.matchMode ?? 'equals'),
+                        });
+                    }
+                }                
             });
 
             const pageFirst = getPageFirst(first, pageSize);
