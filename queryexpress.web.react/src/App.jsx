@@ -12,7 +12,6 @@ import 'primereact/resources/primereact.min.css';
 
 const PAGE_SIZE = 50
 const API_URL = 'https://localhost:7233/api/person'
-const DEBOUNCE_DELAY = 300
 const getPageFirst = (first = 0, pageSize = PAGE_SIZE) => Math.floor(first / pageSize) * pageSize
 const booleanFilterOptions = [
     { label: 'Yes', value: 'true' },
@@ -257,17 +256,15 @@ function App() {
             clearTimeout(filterTimeout.current);
         }
 
-        filterTimeout.current = setTimeout(async () => {
-            const nextState = {
-                ...lazyState,
-                first: 0,
-                filters: event.filters,
-            };
+        const nextState = {
+            ...lazyState,
+            first: 0,
+            filters: event.filters,
+        };
 
-            setLazyState(nextState);
-            setRows([]);
-            await loadData(nextState);
-        }, DEBOUNCE_DELAY);
+        setLazyState(nextState);
+        setRows([]);
+        await loadData(nextState);
     };
 
     // --------------------------------------------
@@ -315,7 +312,7 @@ function App() {
         return (
             <Calendar
                 value={options.value}
-                onChange={(e) => options.filterApplyCallback(e.value)}
+                onChange={(e) => options.filterCallback(e.value)}
                 showTime
                 hourFormat="12"
                 appendTo={document.body}
@@ -350,7 +347,7 @@ function App() {
             <Dropdown
                 value={value}
                 options={booleanFilterOptions}
-                onChange={(e) => options.filterApplyCallback(e.value === '' ? null : e.value === 'true')}
+                onChange={(e) => options.filterCallback(e.value === '' ? null : e.value === 'true')}
             />
         );
     };
@@ -359,7 +356,7 @@ function App() {
         return (
             <InputNumber
                 value={options.value}
-                onValueChange={(e) => options.filterApplyCallback(e.value)}
+                onValueChange={(e) => options.filterCallback(e.value)}
                 useGrouping={false}
                 maxFractionDigits={maxFractionDigits}
             />
