@@ -3,6 +3,7 @@ import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { Calendar } from "primereact/calendar";
 import { Dropdown } from "primereact/dropdown";
+import { InputNumber } from "primereact/inputnumber";
 import { FilterMatchMode, FilterOperator } from 'primereact/api';
 import { Skeleton } from 'primereact/skeleton';
 import './App.css'
@@ -354,6 +355,17 @@ function App() {
         );
     };
 
+    const numericFilterElement = ({ maxFractionDigits = 0 } = {}) => (options) => {
+        return (
+            <InputNumber
+                value={options.value}
+                onValueChange={(e) => options.filterApplyCallback(e.value)}
+                useGrouping={false}
+                maxFractionDigits={maxFractionDigits}
+            />
+        );
+    };
+
     const loadingTemplate = () => {
         return (
             <div
@@ -432,6 +444,7 @@ function App() {
                         filter
                         dataType="numeric"
                         body={textBodyTemplate("age")}
+                        filterElement={numericFilterElement()}
                     />
 
                     <Column
@@ -441,6 +454,7 @@ function App() {
                         filter
                         dataType="numeric"
                         body={textBodyTemplate("litersUsed")}
+                        filterElement={numericFilterElement({ maxFractionDigits: 2 })}
                     />
 
                     <Column
