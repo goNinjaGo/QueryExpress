@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { Calendar } from "primereact/calendar";
-import { TriStateCheckbox } from "primereact/tristatecheckbox";
+import { Dropdown } from "primereact/dropdown";
 import { FilterMatchMode, FilterOperator } from 'primereact/api';
 import { Skeleton } from 'primereact/skeleton';
 
@@ -13,6 +13,11 @@ const PAGE_SIZE = 50
 const API_URL = 'https://localhost:7233/api/person'
 const DEBOUNCE_DELAY = 300
 const getPageFirst = (first = 0, pageSize = PAGE_SIZE) => Math.floor(first / pageSize) * pageSize
+const booleanFilterOptions = [
+    { label: 'All', value: '' },
+    { label: 'Yes', value: 'true' },
+    { label: 'No', value: 'false' },
+]
 
 function App() {
     const [rows, setRows] = useState([]);
@@ -137,11 +142,12 @@ function App() {
                 if (!f) return;
 
                 for (const constraint of f.constraints) {
-                    if (!constraint.value) continue;
+                    const value = normalizeFilterValue(constraint.value);
+                    if (value === null) continue;
 
                     filterData.push({
                         Operand: key,
-                        Value: constraint.value,
+                        Value: value,
                         Operation: opNameToEnumValue(constraint.matchMode ?? 'contains'),
                     });
                 }
@@ -167,6 +173,10 @@ function App() {
 
             const result = await response.json();
 
+            if (!response.ok) {
+                throw new Error(result.title || result.detail || `Request failed with status ${response.status}`);
+            }
+
             setTotalRecords(result.totalRecords);
 
             setRows((prev) => {
@@ -175,8 +185,10 @@ function App() {
                         ? [...prev]
                         : Array.from({ length: result.totalRecords }, () => null);
 
-                for (let i = 0; i < result.data.length; i++) {
-                    virtualRows[pageFirst + i] = result.data[i];
+                const resultData = result.data ?? [];
+
+                for (let i = 0; i < resultData.length; i++) {
+                    virtualRows[pageFirst + i] = resultData[i];
                 }
 
                 return virtualRows;
@@ -313,10 +325,13 @@ function App() {
     };
 
     const boolFilterElement = (options) => {
+        const value = options.value == null ? '' : String(options.value).toLowerCase();
+
         return (
-            <TriStateCheckbox
-                value={options.value}
-                onChange={(e) => options.filterApplyCallback(e.value)}
+            <Dropdown
+                value={value}
+                options={booleanFilterOptions}
+                onChange={(e) => options.filterApplyCallback(e.value === '' ? null : e.value === 'true')}
             />
         );
     };
@@ -458,6 +473,22 @@ function App() {
 }
 
 export default App
+
+function normalizeFilterValue(value) {
+    if (value === null || value === undefined || value === '') {
+        return null;
+    }
+
+    if (typeof value === 'boolean') {
+        return value ? 'True' : 'False';
+    }
+
+    if (value instanceof Date) {
+        return value.toISOString();
+    }
+
+    return String(value);
+}
 
 function opNameToEnumValue(name) {
     switch (name) {
