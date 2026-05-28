@@ -4,10 +4,8 @@ namespace QueryExpress
 {
     public class FilterData
     {
-        public Operation Operation { get; set; } = Operation.Equals;
         public string Operand { get; set; } = string.Empty;
-        public string Value { get; set; } = string.Empty;
-        public string? SecondaryValue { get; set; }
-        public bool IsCaseSensitive { get; set; } = false;
+        public ConditionOperator Operator { get; set; } = ConditionOperator.And;
+        public IEnumerable<Filter> Filters { get; set; } = [];
     }
 }

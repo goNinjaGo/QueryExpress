@@ -131,21 +131,35 @@ function App() {
                     };
                     filterData.push({
                         Operand: key,
-                        Value: value,
-                        Operation: opNameToEnumValue(f.matchMode ?? 'equals'),
+                        Operator: 'And',
+                        Filters: [
+                            {
+                                Value: value,
+                                Operation: opNameToEnumValue(f.matchMode ?? 'equals'),
+                            },
+                        ],
                     });
                 }
                 else {
+                    const filterGroup = {
+                        Operand: key,
+                        Operator: conditionOperatorToEnumValue(f.operator),
+                        Filters: [],
+                    };
+
                     for (const constraint of f.constraints) {
                         const value = normalizeFilterValue(constraint.value);
                         if (value === null) {
                             continue;
                         }
-                        filterData.push({
-                            Operand: key,
+                        filterGroup.Filters.push({
                             Value: value,
                             Operation: opNameToEnumValue(constraint.matchMode ?? 'equals'),
                         });
+                    }
+
+                    if (filterGroup.Filters.length > 0) {
+                        filterData.push(filterGroup);
                     }
                 }                
             });
@@ -519,6 +533,14 @@ function normalizeFilterValue(value) {
     }
 
     return String(value);
+}
+
+function conditionOperatorToEnumValue(operator) {
+    switch (operator) {
+        case 'or': return 'Or'
+        case 'and':
+        default: return 'And'
+    }
 }
 
 function opNameToEnumValue(name) {
