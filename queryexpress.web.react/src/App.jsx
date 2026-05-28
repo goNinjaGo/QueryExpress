@@ -1,163 +1,282 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
-import {
-    useReactTable,
-    getCoreRowModel,
-    getSortedRowModel,
-    getFilteredRowModel,
-} from '@tanstack/react-table'
-import { TriStateCheckbox } from 'primereact/tristatecheckbox'
-import { Calendar } from 'primereact/calendar'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { DataTable } from "primereact/datatable";
+import { Column } from "primereact/column";
+import { InputText } from "primereact/inputtext";
+import { Calendar } from "primereact/calendar";
+import { TriStateCheckbox } from "primereact/tristatecheckbox";
+import { FilterMatchMode, FilterOperator } from 'primereact/api';
 import './App.css'
 import 'primereact/resources/themes/lara-dark-blue/theme.css';
 import 'primereact/resources/primereact.min.css';
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 50
 const API_URL = 'https://localhost:7233/api/person'
+const DEBOUNCE_DELAY = 300
 
 function App() {
-    const [data, setData] = useState([])
+    const [rows, setRows] = useState([]);
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState(null)
-    const [pageNum, setPageNum] = useState(1)
-    const [hasMore, setHasMore] = useState(true)
+    const [totalRecords, setTotalRecords] = useState(0);
 
-    const [sorting, setSorting] = useState([]) // [{id, desc}]
-    const [filters, setFilters] = useState({}) // {columnId: value}
-    // UI input state for filters (updated on every keystroke). Applied filters are debounced into `filters`.
-    const [filterInputs, setFilterInputs] = useState({})
+    const [lazyState, setLazyState] = useState({
+        first: 0,
+        rows: PAGE_SIZE,
+        multiSortMeta: [],
+        filters: {
+            firstName: {
+                operator: FilterOperator.AND,
+                constraints: [
+                    {
+                        value: null,
+                        matchMode: FilterMatchMode.CONTAINS,
+                    },
+                ],
+            },
+            lastName: {
+                operator: FilterOperator.AND,
+                constraints: [
+                    {
+                        value: null,
+                        matchMode: FilterMatchMode.CONTAINS,
+                    },
+                ],
+            },
+            email: {
+                operator: FilterOperator.AND,
+                constraints: [
+                    {
+                        value: null,
+                        matchMode: FilterMatchMode.CONTAINS,
+                    },
+                ],
+            },
+            age: {
+                operator: FilterOperator.AND,
+                constraints: [
+                    {
+                        value: null,
+                        matchMode: FilterMatchMode.EQUALS,
+                    },
+                ],
+            },
+            litersUsed: {
+                operator: FilterOperator.AND,
+                constraints: [
+                    {
+                        value: null,
+                        matchMode: FilterMatchMode.EQUALS,
+                    },
+                ],
+            },
+            createdAt: {
+                operator: FilterOperator.AND,
+                constraints: [
+                    {
+                        value: null,
+                        matchMode: FilterMatchMode.DATE_IS,
+                    },
+                ],
+            },
+            updatedAt: {
+                operator: FilterOperator.AND,
+                constraints: [
+                    {
+                        value: null,
+                        matchMode: FilterMatchMode.DATE_IS,
+                    },
+                ],
+            },
+            isEligibile: {
+                operator: FilterOperator.AND,
+                constraints: [
+                    {
+                        value: null,
+                        matchMode: FilterMatchMode.EQUALS,
+                    },
+                ],
+            },
+            isUtilized: {
+                operator: FilterOperator.AND,
+                constraints: [
+                    {
+                        value: null,
+                        matchMode: FilterMatchMode.EQUALS,
+                    },
+                ],
+            },
+        },
+    });
 
-    const tableColumns = useMemo(
-        () => [
-            { accessorKey: 'firstName', header: 'First Name', dataType: 'string' },
-            { accessorKey: 'lastName', header: 'Last Name', dataType: 'string' },
-            { accessorKey: 'email', header: 'Email', dataType: 'string' },
-            { accessorKey: 'age', header: 'Age', dataType: 'number' },
-            { accessorKey: 'litersUsed', header: 'Liters Used', dataType: 'number' },
-            { accessorKey: 'createdAt', header: 'Created At', dataType: 'date' },
-            { accessorKey: 'updatedAt', header: 'Updated At', dataType: 'date' },
-            { accessorKey: 'isEligibile', header: 'Is Eligible', dataType: 'boolean' },
-            { accessorKey: 'isUtilized', header: 'Is Utilized', dataType: 'boolean' },
-        ],
-        []
-    )
+    const abortRef = useRef(null);
+    const filterTimeout = useRef(null);
 
-    const table = useReactTable({
-        data,
-        columns: tableColumns,
-        state: { sorting },
-        onSortingChange: setSorting,
-        getCoreRowModel: getCoreRowModel(),
-        getSortedRowModel: getSortedRowModel(),
-        getFilteredRowModel: getFilteredRowModel(),
-        manualPagination: true,
-        manualSorting: true,
-        manualFiltering: true,
-        pageCount: -1,
-    })
+    // --------------------------------------------
+    // Fetch data from server
+    // --------------------------------------------
+    const loadData = async ({
+        first,
+        rows: pageSize,
+        multiSortMeta,
+        filters,
+        append = false,
+    }) => {
+        try {
+            setLoading(true);
 
-    // Fetch page of data from server using DataQuery POST body
-    const fetchPage = useCallback(
-        async (pNum) => {
-            setLoading(true)
-            const filterData = []
-            for (const col of tableColumns) {
-                const key = col.accessorKey
-                const f = filters[key]
-                if (!f) continue
-                // include filter entry even if value is empty when an operator was explicitly chosen
+            // cancel previous request
+            if (abortRef.current) {
+                abortRef.current.abort();
+            }
+
+            abortRef.current = new AbortController();
+
+            const filterData = [];
+            Object.entries(filters || {}).forEach(([key, f]) => {
+                if (!f || !f.constraints.value) return;
+
                 filterData.push({
                     Operand: key,
-                    Value: f.value ?? '',
-                    SecondaryValue: f.secondaryValue ?? null,
-                    Operation: f.op ?? defaultOpForType(col.dataType),
-                    IsCaseSensitive: f.isCaseSensitive ?? false,
-                })
-            }
+                    Value: f.constraints.value ?? '',
+                    Operation: opNameToEnumValue(f.constraints.matchMode ?? 'contains'),
+                });
+            });
 
-            const dq = {
-                PageData: { PageNum: pNum, PageSize: PAGE_SIZE },
-                SortData: (sorting || []).map((s) => ({ ColumnName: s.id, SortDirection: s.desc ? 'Desc' : 'Asc' })),
-                FilterData: filterData,
-            }
+            const body = {
+                pageData: { pageNum: Math.round(first / PAGE_SIZE) + 1, pageSize: PAGE_SIZE },
+                sortData: (multiSortMeta || []).map((s) => ({ columnName: s.field, sortDirection: s.order === 1 ? 'Asc' : 'Desc' })),
+                filterData: filterData,
+            };
 
-            function opNameToEnumValue(name) {
-                switch (name) {
-                    case 'Equals': return 'Equals'
-                    case 'Not Equals': return 'NotEquals'
-                    case 'Between': return 'Between'
-                    case '<': return 'LessThan'
-                    case '<=': return 'LessThanOrEqual'
-                    case '>': return 'GreaterThan'
-                    case '>=': return 'GreaterThanOrEqual'
-                    case 'Contains': return 'Contains'
-                    case 'Does Not Contain': return 'DoesNotContain'
-                    case 'Starts With': return 'StartsWith'
-                    case 'Ends With': return 'EndsWith'
-                    default: return 'Equals'
-                }
-            }
-
-            dq.FilterData = dq.FilterData.map(fd => ({
-                ...fd,
-                Operation: opNameToEnumValue(fd.Operation)
-            }))
-
-            try {
-                const res = await fetch(API_URL, {
+            const response = await fetch(
+                API_URL,
+                {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(dq),
-                })
-                if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-                const items = await res.json()                
-                setData(items)
+                    body: JSON.stringify(body),
+                    signal: abortRef.current.signal,
+                }
+            );
 
-                setError(null)
-            } catch (err) {
-                setError(err.message)
-            } finally {
-                setLoading(false)
+            const result = await response.json();
+
+            setRows((prev) =>
+                append ? [...prev, ...result.data] : result.data
+            );
+
+            setTotalRecords(result.totalRecords);
+        } catch (err) {
+            if (err.name !== "AbortError") {
+                setError(err.message || "Error fetching data");
             }
-        },
-        [sorting, filters]
-    )
-
-    // Reset and fetch when sorting or filters change
-    useEffect(() => {
-        setPageNum(1)
-        setData([])
-        setHasMore(true)
-        fetchPage(1)
-    }, [sorting, filters, fetchPage])
-
-    // Apply UI inputs to the actual filters with a debounce so requests aren't made on every keystroke
-    useEffect(() => {
-        const t = setTimeout(() => {
-            setFilters(filterInputs)
-        }, 300)
-        return () => clearTimeout(t)
-    }, [filterInputs])
-
-    useEffect(() => {
-        if (pageNum === 1) return
-        fetchPage(pageNum)
-    }, [pageNum, fetchPage])
-
-
-    // Position an appended calendar overlay so it appears directly below the input
-    const positionCalendarOverlay = (colId) => {
-        try {
-            const input = document.getElementById(`calendar-input-${colId}`)
-            const panel = document.querySelector(`.calendar-overlay-${colId}`)
-            if (!input || !panel) return
-            const rect = input.getBoundingClientRect()
-            panel.style.position = 'absolute'
-            panel.style.left = `${rect.left + window.scrollX}px`
-            panel.style.top = `${rect.bottom + window.scrollY}px`
-        } catch {
-            // ignore positioning errors
+        } finally {
+            setLoading(false);
         }
-    }
+    };
+
+    // Initial load
+    useEffect(() => {
+        loadData({
+            ...lazyState,
+            append: false,
+        });
+    }, []);
+
+    // --------------------------------------------
+    // Infinite scroll handler
+    // --------------------------------------------
+    const onVirtualScroll = async (event) => {
+        const nextFirst = event.first;
+
+        // Already loaded enough rows
+        if (nextFirst < rows.length) {
+            return;
+        }
+
+        const nextState = {
+            ...lazyState,
+            first: nextFirst,
+        };
+
+        setLazyState(nextState);
+
+        await loadData({
+            ...nextState,
+            append: true,
+        });
+    };
+
+    // --------------------------------------------
+    // Server-side sorting
+    // --------------------------------------------
+    const onSort = async (event) => {
+        const nextState = {
+            ...lazyState,
+            first: 0,
+            multiSortMeta: event.multiSortMeta,
+        };
+
+        setLazyState(nextState);
+
+        await loadData({
+            ...nextState,
+            append: false,
+        });
+    };
+
+    // --------------------------------------------
+    // Server-side filtering
+    // --------------------------------------------
+    const onFilter = async (event) => {
+        const nextState = {
+            ...lazyState,
+            first: 0,
+            filters: event.filters,
+        };
+
+        setLazyState(nextState);
+
+        if (filterTimeout.current) {
+            clearTimeout(filterTimeout.current);
+        }
+
+        filterTimeout.current = setTimeout(async () => {
+            await loadData({
+                ...nextState,
+                append: false,
+            });
+        }, DEBOUNCE_DELAY);
+    };
+
+    // --------------------------------------------
+    // Templates
+    // --------------------------------------------
+    const formatDate = (value) => {
+        if (!value) return "";
+
+        return new Intl.DateTimeFormat("en-US", {
+            dateStyle: "medium",
+            timeStyle: "short",
+        }).format(new Date(value));
+    };
+
+    const dateBodyTemplate = (field) => (rowData) => {
+        return formatDate(rowData[field]);
+    };
+
+    const booleanBodyTemplate = (field) => (rowData) => {
+        if (rowData[field] === true) {
+            return 'Yes'
+        }
+
+        if (rowData[field] === false) {
+            return 'No';
+        }
+
+        return '';
+    };
+
+    
 
     return (
         <div className="app-container">
@@ -168,121 +287,104 @@ function App() {
             {error && <div className="error">Error: {error}</div>}
 
             <div className="grid-viewport">
-                <table className="data-grid">
-                    <thead>
-                        {table.getHeaderGroups().map((hg) => (
-                            <tr key={hg.id}>
-                                {hg.headers.map((h) => {
-                                    const colId = h.column.id
-                                    const colDef = tableColumns.find((c) => c.accessorKey === colId) || {}
-                                    const inputState = (filterInputs[colId] ?? filters[colId]) || { op: defaultOpForType(colDef.dataType), value: '', secondaryValue: '' }
-                                    return (
-                                        <th key={h.id}>
-                                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                <div className="column-header-title">{h.column.columnDef.header}</div>
-                                                <div
-                                                    style={{ cursor: 'pointer', marginLeft: 8 }}
-                                                    onClick={() => {
-                                                        const id = colId
-                                                        const current = sorting.find((s) => s.id === id)
-                                                        if (!current) setSorting([{ id, desc: false }])
-                                                        else if (!current.desc) setSorting([{ id, desc: true }])
-                                                        else setSorting([])
-                                                    }}
-                                                >
-                                                    {sorting.find((s) => s.id === h.column.id)
-                                                        ? sorting.find((s) => s.id === h.column.id).desc
-                                                            ? ' 🔽'
-                                                            : ' 🔼'
-                                                        : ' ⇅'}
-                                                </div>
-                                            </div>
-                                            <div className="filter-in-header">
-                                                <select
-                                                    value={inputState.op}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value
-                                                        setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), op: val } }))
-                                                        setFilters((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), op: val } }))
-                                                    }}
-                                                >
-                                                    {operatorOptionsForType(colDef.dataType).map((op) => (
-                                                        <option key={op} value={op}>
-                                                            {op}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                                {inputState.op === 'Between' ? (
-                                                    colDef.dataType === 'date' ? (
-                                                        // For date-between use a single range calendar
-                                                        <Calendar
-                                                            value={(() => {
-                                                                const v = []
-                                                                if (inputState.value) v.push(new Date(inputState.value))
-                                                                if (inputState.secondaryValue) v.push(new Date(inputState.secondaryValue))
-                                                                return v.length ? v : null
-                                                            })()}
-                                                            selectionMode="range"
-                                                            onChange={(e) => {
-                                                                const vals = e.value || []
-                                                                const start = vals[0] ? vals[0].toISOString() : ''
-                                                                const end = vals[1] ? vals[1].toISOString() : ''
-                                                                setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), value: start, secondaryValue: end } }))
-                                                            }}
-                                                            showTime
-                                                            hourFormat="12"
-                                                            appendTo={document.body}
-                                                                    inputId={colId ? `calendar-input-${colId}` : undefined}
-                                                                    panelClassName={colId ? `calendar-overlay-${colId}` : undefined}
-                                                                    onShow={() => colId && positionCalendarOverlay && positionCalendarOverlay(colId)}
-                                                        />
-                                                    ) : (
-                                                        <>
-                                                            {renderFilterInput(colDef.dataType, inputState.value ?? '', (val) =>
-                                                                setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), value: val } })), colId, positionCalendarOverlay
-                                                            )}
-                                                            {renderFilterInput(colDef.dataType, inputState.secondaryValue ?? '', (val) =>
-                                                                setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), secondaryValue: val } })), colId, positionCalendarOverlay
-                                                            )}
-                                                        </>
-                                                    )
-                                                ) : (
-                                                    renderFilterInput(colDef.dataType, inputState.value ?? '', (val) =>
-                                                        setFilterInputs((fs) => ({ ...(fs || {}), [colId]: { ...(fs?.[colId] || {}), value: val } })), colId, positionCalendarOverlay
-                                                    )
-                                                )}
-                                            </div>
-                                        </th>
-                                    )
-                                })}
-                            </tr>
-                        ))}
-                    </thead>
+                <DataTable
+                    className="data-grid"
+                    value={rows}
+                    lazy
+                    dataKey="id"
+                    scrollable
+                    scrollHeight="600px"
+                    virtualScrollerOptions={{
+                        lazy: true,
+                        onLazyLoad: onVirtualScroll,
+                        itemSize: 46,
+                        delay: 150,
+                        showLoader: true,
+                        loading,
+                    }}
+                    totalRecords={totalRecords}
+                    loading={loading}
+                    filterDisplay="menu"
+                    filters={lazyState.filters}
+                    onFilter={onFilter}
+                    sortMode="multiple"
+                    multiSortMeta={lazyState.multiSortMeta}
+                    onSort={onSort}
+                    removableSort
+                >
+                    <Column
+                        field="firstName"
+                        header="First Name"
+                        sortable
+                        filter
+                    />
 
-                    <tbody>
-                        {data.map((item, idx) => (
-                            <tr key={idx}>
-                                {tableColumns.map((c) => (
-                                    <td key={c.accessorKey}>{formatCell(item, c.accessorKey)}</td>
-                                ))}
-                            </tr>
-                        ))}
-                        {loading && (
-                            <tr>
-                                <td colSpan={tableColumns.length} className="loading-row">
-                                    Loading...
-                                </td>
-                            </tr>
-                        )}
-                        {!loading && !hasMore && data.length === 0 && (
-                            <tr>
-                                <td colSpan={tableColumns.length} className="loading-row">
-                                    No results
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+                    <Column
+                        field="lastName"
+                        header="Last Name"
+                        sortable
+                        filter
+                    />
+
+                    <Column
+                        field="email"
+                        header="Email"
+                        sortable
+                        filter
+                    />
+
+                    <Column
+                        field="age"
+                        header="Age"
+                        sortable
+                        filter
+                        dataType="number"
+                    />
+
+                    <Column
+                        field="litersUsed"
+                        header="Liters Used"
+                        sortable
+                        filter
+                        dataType="number"
+                    />
+
+                    <Column
+                        field="createdAt"
+                        header="Created"
+                        sortable
+                        body={dateBodyTemplate("createdAt")}
+                        filter
+                        dataType="date"
+                    />
+
+                    <Column
+                        field="updatedAt"
+                        header="Updated"
+                        sortable
+                        body={dateBodyTemplate("updatedAt")}
+                        filter
+                        dataType="date"
+                    />
+
+                    <Column
+                        field="isEligibile"
+                        header="Eligible"
+                        sortable
+                        body={booleanBodyTemplate("isEligibile")}
+                        filter
+                        dataType="boolean"
+                    />
+
+                    <Column
+                        field="isUtilized"
+                        header="Utilized"
+                        sortable
+                        body={booleanBodyTemplate("isUtilized")}
+                        filter
+                        dataType="boolean"
+                    />
+                </DataTable>
             </div>
 
             {loading && <div className="loading-indicator">Loading...</div>}
@@ -290,98 +392,24 @@ function App() {
     )
 }
 
-function formatCell(item, key) {
-    if (!item) return ''
-    const v = item[key]
-    if (v === null || v === undefined) return ''
-    if (typeof v === 'boolean') return v ? 'Yes' : 'No'
-    // format dates
-    const dateKeys = ['createdAt', 'CreatedAt', 'updatedAt', 'UpdatedAt']
-    if (dateKeys.includes(key) || /^[0-9]{4}-[0-9]{2}-[0-9]{2}T/.test(String(v))) {
-        const d = new Date(v)
-        if (!isNaN(d.getTime())) {
-            return formatDateMMDD(d)
-        }
-    }
-    return String(v)
-}
-
 export default App
 
-function defaultOpForType(type) {
-    switch (type) {
-        case 'string':
-            return 'Contains'
-        default:
-            return 'Equals'
+function opNameToEnumValue(name) {
+    switch (name) {
+        case 'equals': return 'Equals'
+        case 'notEquals': return 'NotEquals'
+        case 'lt': return 'LessThan'
+        case 'lte': return 'LessThanOrEqual'
+        case 'gt': return 'GreaterThan'
+        case 'gte': return 'GreaterThanOrEqual'
+        case 'contains': return 'Contains'
+        case 'notContains': return 'DoesNotContain'
+        case 'startsWith': return 'StartsWith'
+        case 'endsWith': return 'EndsWith'
+        case 'dateIs': return 'Equals'
+        case 'dateIsNot': return 'NotEquals'
+        case 'dateBefore': return 'LessThan'
+        case 'dateAfter': return 'GreaterThan'
+        default: return 'Equals'
     }
 }
-
-function operatorOptionsForType(type) {
-    switch (type) {
-        case 'number':
-        case 'date':
-            return ['Equals', 'Not Equals', '<', '<=', '>', '>=', 'Between']
-        case 'boolean':
-            return ['Equals', 'Not Equals']
-        default:
-            return ['Contains', 'Does Not Contain', 'Starts With', 'Ends With', 'Equals', 'Not Equals']
-    }
-}
-
-function renderFilterInput(type, value, onChange, colId, positionCalendarOverlay) {
-    if (type === 'number') {
-        return (
-            <input
-                type="number"
-                value={value ?? ''}
-                onChange={(e) => onChange(e.target.value)}
-                style={{ width: 100 }}
-            />
-        )
-    }
-    if (type === 'date') {
-        const v = value ? new Date(value) : null
-        return (
-            <Calendar
-                value={v}
-                onChange={(e) => onChange(e.value ? e.value.toISOString() : '')}
-                showTime
-                hourFormat="12"
-                appendTo={document.body}
-                inputId={colId ? `calendar-input-${colId}` : undefined}
-                panelClassName={colId ? `calendar-overlay-${colId}` : undefined}
-                onShow={() => colId && positionCalendarOverlay && positionCalendarOverlay(colId)}
-            />
-        )
-    }
-    if (type === 'boolean') {
-        // TriStateCheckbox accepts true / false / null (indeterminate)
-        const normalized = value === true || value === 'true' ? true : value === false || value === 'false' ? false : null
-        return (
-            <TriStateCheckbox
-                value={normalized}
-                onChange={(e) => onChange(e.value + '')}
-            />
-        )
-    }
-
-    return (
-        <input
-            value={value ?? ''}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder="..."
-            style={{ width: 100 }}
-        />
-    )
-}
-
-function formatDateMMDD(d) {
-    const mm = String(d.getMonth() + 1).padStart(2, '0')
-    const dd = String(d.getDate()).padStart(2, '0')
-    const yyyy = d.getFullYear()
-    const hh = String(d.getHours()).padStart(2, '0')
-    const min = String(d.getMinutes()).padStart(2, '0')
-    return `${mm}/${dd}/${yyyy} ${hh}:${min}`
-}
-
