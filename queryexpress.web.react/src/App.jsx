@@ -485,9 +485,9 @@ function App() {
                         filterElement={boolFilterElement}
                     />
                 </DataTable>
-            </div>
 
-            {loading && <div className="loading-indicator">Loading...</div>}
+                {loading && <div className="loading-indicator">Loading...</div>}
+            </div>
         </div>
     )
 }

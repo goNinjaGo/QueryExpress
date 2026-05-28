@@ -3,6 +3,10 @@
   padding: 20px 20px 0 20px;
 }
 
+.grid-viewport {
+  position: relative;
+}
+
 .data-grid {
   --grid-header-bg: #26364f;
   --grid-header-text: #f8fafc;
@@ -46,4 +50,20 @@
     padding-top: 0.5rem;
     padding-bottom: 0.5rem;
     white-space: nowrap;
+}
+
+.loading-indicator {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 10;
+    transform: translate(-50%, -50%);
+    padding: 0.75rem 1rem;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 6px;
+    background: rgba(15, 23, 42, 0.88);
+    color: #f8fafc;
+    font-weight: 600;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.28);
+    pointer-events: none;
 }
