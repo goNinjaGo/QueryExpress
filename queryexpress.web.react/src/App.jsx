@@ -5,7 +5,7 @@ import { InputText } from "primereact/inputtext";
 import { Calendar } from "primereact/calendar";
 import { TriStateCheckbox } from "primereact/tristatecheckbox";
 import { FilterMatchMode, FilterOperator } from 'primereact/api';
-import './App.css'
+
 import 'primereact/resources/themes/lara-dark-blue/theme.css';
 import 'primereact/resources/primereact.min.css';
 
@@ -87,8 +87,24 @@ function App() {
                     },
                 ],
             },
-            isEligibile: { value: null, matchMode: FilterMatchMode.EQUALS },
-            isUtilized: { value: null, matchMode: FilterMatchMode.EQUALS },
+            isEligibile: {
+                operator: FilterOperator.AND,
+                constraints: [
+                    {
+                        value: null,
+                        matchMode: FilterMatchMode.EQUALS,
+                    },
+                ],
+            },
+            isUtilized: {
+                operator: FilterOperator.AND,
+                constraints: [
+                    {
+                        value: null,
+                        matchMode: FilterMatchMode.EQUALS,
+                    },
+                ],
+            },
         },
     });
 
@@ -119,28 +135,15 @@ function App() {
             Object.entries(filters || {}).forEach(([key, f]) => {
                 if (!f) return;
 
-                // Flat filter
-                if (f.matchMode !== undefined) {
-                    if (f.value === null || f.value === undefined) return;
+                for (const constraint of f.constraints) {
+                    if (!constraint.value) continue;
+
                     filterData.push({
                         Operand: key,
-                        Value: f.value,
-                        Operation: opNameToEnumValue(f.matchMode ?? 'equals'),
+                        Value: constraint.value,
+                        Operation: opNameToEnumValue(constraint.matchMode ?? 'contains'),
                     });
-                    return;
-                }
-
-                // Constraints
-                if (f.constraints) {
-                    for (const constraint of f.constraints) {
-                        if (constraint.value === null || constraint.value === undefined) continue;
-                        filterData.push({
-                            Operand: key,
-                            Value: constraint.value,
-                            Operation: opNameToEnumValue(constraint.matchMode ?? 'contains'),
-                        });
-                    }
-                }
+                }                
             });
 
             const body = {
@@ -161,14 +164,8 @@ function App() {
 
             const result = await response.json();
 
-            const mapped = result.data.map((row) => ({
-                ...row,
-                createdAt: row.createdAt ? new Date(row.createdAt) : null,
-                updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
-            }));
-
             setRows((prev) =>
-                append ? [...prev, ...mapped] : mapped
+                append ? [...prev, ...result.data] : result.data
             );
 
             setTotalRecords(result.totalRecords);
@@ -283,22 +280,6 @@ function App() {
         return '';
     };
 
-    const booleanFilterTemplate = (options) => (
-        <TriStateCheckbox
-            value={options.value}
-            onChange={(e) => options.filterCallback(e.value)}
-        />
-    );
-
-    const dateFilterTemplate = (options) => (
-        <Calendar
-            value={options.value}
-            onChange={(e) => options.filterCallback(e.value, options.index)}
-            showTime
-            hourFormat="12"
-        />
-    );
-
     
 
     return (
@@ -361,7 +342,7 @@ function App() {
                         header="Age"
                         sortable
                         filter
-                        dataType="number"
+                        dataType="numeric"
                     />
 
                     <Column
@@ -369,7 +350,7 @@ function App() {
                         header="Liters Used"
                         sortable
                         filter
-                        dataType="number"
+                        dataType="numeric"
                     />
 
                     <Column
@@ -378,7 +359,7 @@ function App() {
                         sortable
                         body={dateBodyTemplate("createdAt")}
                         filter
-                        filterElement={dateFilterTemplate}
+                        dataType="date"
                     />
 
                     <Column
@@ -387,7 +368,7 @@ function App() {
                         sortable
                         body={dateBodyTemplate("updatedAt")}
                         filter
-                        filterElement={dateFilterTemplate}
+                        dataType="date"
                     />
 
                     <Column
@@ -396,7 +377,7 @@ function App() {
                         sortable
                         body={booleanBodyTemplate("isEligibile")}
                         filter
-                        filterElement={booleanFilterTemplate}
+                        dataType="boolean"
                     />
 
                     <Column
@@ -405,7 +386,7 @@ function App() {
                         sortable
                         body={booleanBodyTemplate("isUtilized")}
                         filter
-                        filterElement={booleanFilterTemplate}
+                        dataType="boolean"
                     />
                 </DataTable>
             </div>
