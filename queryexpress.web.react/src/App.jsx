@@ -87,24 +87,8 @@ function App() {
                     },
                 ],
             },
-            isEligibile: {
-                operator: FilterOperator.AND,
-                constraints: [
-                    {
-                        value: null,
-                        matchMode: FilterMatchMode.EQUALS,
-                    },
-                ],
-            },
-            isUtilized: {
-                operator: FilterOperator.AND,
-                constraints: [
-                    {
-                        value: null,
-                        matchMode: FilterMatchMode.EQUALS,
-                    },
-                ],
-            },
+            isEligibile: { value: null, matchMode: FilterMatchMode.EQUALS },
+            isUtilized: { value: null, matchMode: FilterMatchMode.EQUALS },
         },
     });
 
@@ -133,13 +117,30 @@ function App() {
 
             const filterData = [];
             Object.entries(filters || {}).forEach(([key, f]) => {
-                if (!f || !f.constraints.value) return;
+                if (!f) return;
 
-                filterData.push({
-                    Operand: key,
-                    Value: f.constraints.value ?? '',
-                    Operation: opNameToEnumValue(f.constraints.matchMode ?? 'contains'),
-                });
+                // Flat filter
+                if (f.matchMode !== undefined) {
+                    if (f.value === null || f.value === undefined) return;
+                    filterData.push({
+                        Operand: key,
+                        Value: f.value,
+                        Operation: opNameToEnumValue(f.matchMode ?? 'equals'),
+                    });
+                    return;
+                }
+
+                // Constraints
+                if (f.constraints) {
+                    for (const constraint of f.constraints) {
+                        if (constraint.value === null || constraint.value === undefined) continue;
+                        filterData.push({
+                            Operand: key,
+                            Value: constraint.value,
+                            Operation: opNameToEnumValue(constraint.matchMode ?? 'contains'),
+                        });
+                    }
+                }
             });
 
             const body = {
@@ -160,8 +161,14 @@ function App() {
 
             const result = await response.json();
 
+            const mapped = result.data.map((row) => ({
+                ...row,
+                createdAt: row.createdAt ? new Date(row.createdAt) : null,
+                updatedAt: row.updatedAt ? new Date(row.updatedAt) : null,
+            }));
+
             setRows((prev) =>
-                append ? [...prev, ...result.data] : result.data
+                append ? [...prev, ...mapped] : mapped
             );
 
             setTotalRecords(result.totalRecords);
@@ -276,6 +283,22 @@ function App() {
         return '';
     };
 
+    const booleanFilterTemplate = (options) => (
+        <TriStateCheckbox
+            value={options.value}
+            onChange={(e) => options.filterCallback(e.value)}
+        />
+    );
+
+    const dateFilterTemplate = (options) => (
+        <Calendar
+            value={options.value}
+            onChange={(e) => options.filterCallback(e.value, options.index)}
+            showTime
+            hourFormat="12"
+        />
+    );
+
     
 
     return (
@@ -355,7 +378,7 @@ function App() {
                         sortable
                         body={dateBodyTemplate("createdAt")}
                         filter
-                        dataType="date"
+                        filterElement={dateFilterTemplate}
                     />
 
                     <Column
@@ -364,7 +387,7 @@ function App() {
                         sortable
                         body={dateBodyTemplate("updatedAt")}
                         filter
-                        dataType="date"
+                        filterElement={dateFilterTemplate}
                     />
 
                     <Column
@@ -373,7 +396,7 @@ function App() {
                         sortable
                         body={booleanBodyTemplate("isEligibile")}
                         filter
-                        dataType="boolean"
+                        filterElement={booleanFilterTemplate}
                     />
 
                     <Column
@@ -382,7 +405,7 @@ function App() {
                         sortable
                         body={booleanBodyTemplate("isUtilized")}
                         filter
-                        dataType="boolean"
+                        filterElement={booleanFilterTemplate}
                     />
                 </DataTable>
             </div>
