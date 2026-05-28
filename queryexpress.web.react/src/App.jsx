@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
-import { InputText } from "primereact/inputtext";
 import { Calendar } from "primereact/calendar";
 import { TriStateCheckbox } from "primereact/tristatecheckbox";
 import { FilterMatchMode, FilterOperator } from 'primereact/api';
+import { Skeleton } from 'primereact/skeleton';
 
 import 'primereact/resources/themes/lara-dark-blue/theme.css';
 import 'primereact/resources/primereact.min.css';
@@ -12,6 +12,8 @@ import 'primereact/resources/primereact.min.css';
 const PAGE_SIZE = 50
 const API_URL = 'https://localhost:7233/api/person'
 const DEBOUNCE_DELAY = 300
+const isRowLoaded = (row) => row != null
+const getPageFirst = (first = 0, pageSize = PAGE_SIZE) => Math.floor(first / pageSize) * pageSize
 
 function App() {
     const [rows, setRows] = useState([]);
@@ -21,7 +23,7 @@ function App() {
 
     const [lazyState, setLazyState] = useState({
         first: 0,
-        rows: PAGE_SIZE,
+        pageSize: PAGE_SIZE,
         multiSortMeta: [],
         filters: {
             firstName: {
@@ -110,16 +112,16 @@ function App() {
 
     const abortRef = useRef(null);
     const filterTimeout = useRef(null);
+    const initialLazyState = useRef(lazyState);
 
     // --------------------------------------------
     // Fetch data from server
     // --------------------------------------------
-    const loadData = async ({
+    const loadData = useCallback(async ({
         first,
-        rows: pageSize,
+        pageSize,
         multiSortMeta,
         filters,
-        append = false,
     }) => {
         try {
             setLoading(true);
@@ -143,13 +145,15 @@ function App() {
                         Value: constraint.value,
                         Operation: opNameToEnumValue(constraint.matchMode ?? 'contains'),
                     });
-                }                
+                }
             });
 
+            const pageFirst = getPageFirst(first, pageSize);
+
             const body = {
-                pageData: { pageNum: Math.round(first / PAGE_SIZE) + 1, pageSize: PAGE_SIZE },
+                pageData: { pageNum: Math.floor(pageFirst / pageSize) + 1, pageSize },
                 sortData: (multiSortMeta || []).map((s) => ({ columnName: s.field, sortDirection: s.order === 1 ? 'Asc' : 'Desc' })),
-                filterData: filterData,
+                filterData,
             };
 
             const response = await fetch(
@@ -164,11 +168,20 @@ function App() {
 
             const result = await response.json();
 
-            setRows((prev) =>
-                append ? [...prev, ...result.data] : result.data
-            );
-
             setTotalRecords(result.totalRecords);
+
+            setRows((prev) => {
+                const virtualRows =
+                    prev.length === result.totalRecords
+                        ? [...prev]
+                        : Array.from({ length: result.totalRecords }, () => null);
+
+                for (let i = 0; i < result.data.length; i++) {
+                    virtualRows[pageFirst + i] = result.data[i];
+                }
+
+                return virtualRows;
+            });
         } catch (err) {
             if (err.name !== "AbortError") {
                 setError(err.message || "Error fetching data");
@@ -176,38 +189,33 @@ function App() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     // Initial load
     useEffect(() => {
-        loadData({
-            ...lazyState,
-            append: false,
-        });
-    }, []);
+        const timeoutId = setTimeout(() => {
+            loadData(initialLazyState.current);
+        }, 0);
+
+        return () => clearTimeout(timeoutId);
+    }, [loadData]);
 
     // --------------------------------------------
     // Infinite scroll handler
     // --------------------------------------------
     const onVirtualScroll = async (event) => {
-        const nextFirst = event.first;
+        const first = event.first ?? 0;
+        const last = event.last ?? first + PAGE_SIZE;
+        const needLoad = rows.slice(first, last).some((row) => !isRowLoaded(row));
 
-        // Already loaded enough rows
-        if (nextFirst < rows.length) {
-            return;
+        if (needLoad) {
+            await loadData({
+                first: getPageFirst(first, PAGE_SIZE),
+                pageSize: PAGE_SIZE,
+                multiSortMeta: lazyState.multiSortMeta,
+                filters: lazyState.filters,
+            });
         }
-
-        const nextState = {
-            ...lazyState,
-            first: nextFirst,
-        };
-
-        setLazyState(nextState);
-
-        await loadData({
-            ...nextState,
-            append: true,
-        });
     };
 
     // --------------------------------------------
@@ -222,10 +230,7 @@ function App() {
 
         setLazyState(nextState);
 
-        await loadData({
-            ...nextState,
-            append: false,
-        });
+        await loadData(nextState);
     };
 
     // --------------------------------------------
@@ -245,10 +250,7 @@ function App() {
         }
 
         filterTimeout.current = setTimeout(async () => {
-            await loadData({
-                ...nextState,
-                append: false,
-            });
+            await loadData(nextState);
         }, DEBOUNCE_DELAY);
     };
 
@@ -265,14 +267,19 @@ function App() {
     };
 
     const dateBodyTemplate = (field) => (rowData) => {
+        if (!rowData) {
+            return loadingTemplate();
+        }
         return formatDate(rowData[field]);
     };
 
     const booleanBodyTemplate = (field) => (rowData) => {
+        if (!rowData) {
+            return loadingTemplate();
+        }
         if (rowData[field] === true) {
             return 'Yes'
         }
-
         if (rowData[field] === false) {
             return 'No';
         }
@@ -280,6 +287,48 @@ function App() {
         return '';
     };
 
+    const textBodyTemplate = (field) => (rowData) => {
+        if (!rowData) {
+            return loadingTemplate();
+        }
+
+        return rowData[field] ?? '';
+    };
+
+    const dateFilterElement = (options) => {
+        return (
+            <Calendar
+                value={options.value}
+                onChange={(e) => options.filterApplyCallback(e.value)}
+                showTime
+                hourFormat="12"
+            />
+        );
+    };
+
+    const boolFilterElement = (options) => {
+        return (
+            <TriStateCheckbox
+                value={options.value}
+                onChange={(e) => options.filterApplyCallback(e.value)}
+            />
+        );
+    };
+
+    const loadingTemplate = () => {
+        return (
+            <div
+                className="flex align-items-center"
+                style={{
+                    height: '17px',
+                    flexGrow: '1',
+                    overflow: 'hidden',
+                }}
+            >
+                <Skeleton width="60%" height="1rem" />
+            </div>
+        );
+    };
     
 
     return (
@@ -295,19 +344,16 @@ function App() {
                     className="data-grid"
                     value={rows}
                     lazy
-                    dataKey="id"
                     scrollable
                     scrollHeight="600px"
                     virtualScrollerOptions={{
                         lazy: true,
                         onLazyLoad: onVirtualScroll,
-                        itemSize: 46,
+                        itemSize: 100,
                         delay: 150,
-                        showLoader: true,
-                        loading,
+                        showLoader: false
                     }}
                     totalRecords={totalRecords}
-                    loading={loading}
                     filterDisplay="menu"
                     filters={lazyState.filters}
                     onFilter={onFilter}
@@ -321,6 +367,7 @@ function App() {
                         header="First Name"
                         sortable
                         filter
+                        body={textBodyTemplate("firstName")}
                     />
 
                     <Column
@@ -328,6 +375,7 @@ function App() {
                         header="Last Name"
                         sortable
                         filter
+                        body={textBodyTemplate("lastName")}
                     />
 
                     <Column
@@ -335,6 +383,7 @@ function App() {
                         header="Email"
                         sortable
                         filter
+                        body={textBodyTemplate("email")}
                     />
 
                     <Column
@@ -343,6 +392,7 @@ function App() {
                         sortable
                         filter
                         dataType="numeric"
+                        body={textBodyTemplate("age")}
                     />
 
                     <Column
@@ -351,6 +401,7 @@ function App() {
                         sortable
                         filter
                         dataType="numeric"
+                        body={textBodyTemplate("litersUsed")}
                     />
 
                     <Column
@@ -360,6 +411,7 @@ function App() {
                         body={dateBodyTemplate("createdAt")}
                         filter
                         dataType="date"
+                        filterElement={dateFilterElement}
                     />
 
                     <Column
@@ -369,6 +421,7 @@ function App() {
                         body={dateBodyTemplate("updatedAt")}
                         filter
                         dataType="date"
+                        filterElement={dateFilterElement}
                     />
 
                     <Column
@@ -378,6 +431,7 @@ function App() {
                         body={booleanBodyTemplate("isEligibile")}
                         filter
                         dataType="boolean"
+                        filterElement={boolFilterElement}
                     />
 
                     <Column
@@ -387,6 +441,7 @@ function App() {
                         body={booleanBodyTemplate("isUtilized")}
                         filter
                         dataType="boolean"
+                        filterElement={boolFilterElement}
                     />
                 </DataTable>
             </div>
