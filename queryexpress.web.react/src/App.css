@@ -1,250 +1,43 @@
 
 .app-container {
-  padding: 20px;
-}
-
-.grid-viewport {
-  max-height: 600px;
-  max-width: 100%;
-  box-sizing: border-box;
-  overflow-x: auto; /* allow horizontal scroll inside the viewport */
-  overflow-y: auto;
-  border: 1px solid var(--border, #ddd);
-  border-radius: 6px;
+  padding: 20px 20px 0 20px;
 }
 
 .data-grid {
-  border-collapse: collapse;
-  /* let the table size to its content so wide tables scroll inside .grid-viewport
-     keep a sensible minimum equal to the viewport width so narrow tables still fit */
-  width: max-content;
-  min-width: 100%;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  --grid-header-bg: #26364f;
+  --grid-header-text: #f8fafc;
+  --grid-header-border: #3b4a66;
 }
 
 .data-grid thead th {
-  position: sticky;
-  top: 0;
-  background: #f7f7f9;
-  padding: 8px 10px;
-  border-bottom: 1px solid #e1e1e1;
-  text-align: left;
-  vertical-align: bottom;
-  white-space: nowrap; /* keep header contents on single line */
+    background: var(--grid-header-bg);
+    color: var(--grid-header-text);
+    white-space: nowrap;
 }
 
-/* Header title styling: single line, ellipsis if too long */
-.column-header-title {
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: inline-block;
-  max-width: calc(100% - 40px); /* leave room for sort icon */
+.data-grid .p-datatable-thead > tr > th {
+    background: var(--grid-header-bg);
+    color: var(--grid-header-text);
+    border-color: var(--grid-header-border);
+    white-space: nowrap;
 }
 
-.data-grid tbody td {
-  padding: 8px 10px;
-  border-bottom: 1px solid #eee;
+.data-grid .p-column-title,
+.data-grid .p-sortable-column-icon,
+.data-grid .p-column-filter-menu-button,
+.data-grid .p-column-filter-clear-button {
+    color: var(--grid-header-text);
 }
 
-.filter-in-header {
-  margin-top: 6px;
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.filter-in-header input,
-.filter-in-header select {
-  font-size: 13px;
-  padding: 4px 6px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
-
-.loading-row {
-  padding: 12px;
-  text-align: center;
-  color: #666;
-}
-
-.loading-indicator {
-  margin-top: 8px;
-}
-
-.error {
-  color: #b00020;
-  margin-bottom: 8px;
-}
-  &:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
-}
-
-.hero {
-  position: relative;
-
-  .base,
-  .framework,
-  .vite {
-    inset-inline: 0;
-    margin: 0 auto;
-  }
-
-  .base {
-    width: 170px;
-    position: relative;
-    z-index: 0;
-  }
-
-  .framework,
-  .vite {
-    position: absolute;
-  }
-
-  .framework {
-    z-index: 1;
-    top: 34px;
-    height: 28px;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg)
-      scale(1.4);
-  }
-
-  .vite {
-    z-index: 0;
-    top: 107px;
-    height: 26px;
-    width: auto;
-    transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg)
-      scale(0.8);
-  }
-}
-
-#center {
-  display: flex;
-  flex-direction: column;
-  gap: 25px;
-  place-content: center;
-  place-items: center;
-  flex-grow: 1;
-
-  @media (max-width: 1024px) {
-    padding: 32px 20px 24px;
-    gap: 18px;
-  }
-}
-
-#next-steps {
-  display: flex;
-  border-top: 1px solid var(--border);
-  text-align: left;
-
-  & > div {
-    flex: 1 1 0;
-    padding: 32px;
-    @media (max-width: 1024px) {
-      padding: 24px 20px;
-    }
-  }
-
-  .icon {
-    margin-bottom: 16px;
-    width: 22px;
-    height: 22px;
-  }
-
-  @media (max-width: 1024px) {
-    flex-direction: column;
-    text-align: center;
-  }
-}
-
-#docs {
-  border-right: 1px solid var(--border);
-
-  @media (max-width: 1024px) {
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-  }
-}
-
-#next-steps ul {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  gap: 8px;
-  margin: 32px 0 0;
-
-  .logo {
-    height: 18px;
-  }
-
-  a {
-    color: var(--text-h);
-    font-size: 16px;
-    border-radius: 6px;
-    background: var(--social-bg);
+.data-grid .p-column-header-content {
     display: flex;
-    padding: 6px 12px;
     align-items: center;
-    gap: 8px;
-    text-decoration: none;
-    transition: box-shadow 0.3s;
-
-    &:hover {
-      box-shadow: var(--shadow);
-    }
-    .button-icon {
-      height: 18px;
-      width: 18px;
-    }
-  }
-
-  @media (max-width: 1024px) {
-    margin-top: 20px;
-    flex-wrap: wrap;
-    justify-content: center;
-
-    li {
-      flex: 1 1 calc(50% - 8px);
-    }
-
-    a {
-      width: 100%;
-      justify-content: center;
-      box-sizing: border-box;
-    }
-  }
+    flex-wrap: nowrap;
+    white-space: nowrap;
 }
 
-#spacer {
-  height: 88px;
-  border-top: 1px solid var(--border);
-  @media (max-width: 1024px) {
-    height: 48px;
-  }
-}
-
-.ticks {
-  position: relative;
-  width: 100%;
-
-  &::before,
-  &::after {
-    content: '';
-    position: absolute;
-    top: -4.5px;
-    border: 5px solid transparent;
-  }
-
-  &::before {
-    left: 0;
-    border-left-color: var(--border);
-  }
-  &::after {
-    right: 0;
-    border-right-color: var(--border);
-  }
+.data-grid .p-column-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }

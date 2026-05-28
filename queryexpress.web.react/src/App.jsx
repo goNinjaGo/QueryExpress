@@ -5,7 +5,7 @@ import { Calendar } from "primereact/calendar";
 import { Dropdown } from "primereact/dropdown";
 import { FilterMatchMode, FilterOperator } from 'primereact/api';
 import { Skeleton } from 'primereact/skeleton';
-
+import './App.css'
 import 'primereact/resources/themes/lara-dark-blue/theme.css';
 import 'primereact/resources/primereact.min.css';
 
@@ -310,16 +310,37 @@ function App() {
         return rowData[field] ?? '';
     };
 
-    const dateFilterElement = (options) => {
+    const dateFilterElement = (field) => (options) => {
         return (
             <Calendar
                 value={options.value}
                 onChange={(e) => options.filterApplyCallback(e.value)}
                 showTime
                 hourFormat="12"
+                appendTo={document.body}
+                inputId={`calendar-input-${field}`}
+                panelClassName={`calendar-overlay-${field}`}
+                onShow={() => positionCalendarOverlay(field)}
             />
         );
     };
+
+    const positionCalendarOverlay = (colId) => {
+        try {
+            requestAnimationFrame(() => {
+                const input = document.getElementById(`calendar-input-${colId}`)
+                const panel = document.querySelector(`.calendar-overlay-${colId}`)
+                if (!input || !panel) return
+                const rect = input.getBoundingClientRect()
+                const panelRect = panel.getBoundingClientRect()
+                panel.style.position = 'absolute'
+                panel.style.left = `${rect.left + window.scrollX - panelRect.width}px`
+                panel.style.top = `${rect.top + window.scrollY + rect.height / 2 - panelRect.height / 2}px`
+            })
+        } catch {
+            // ignore positioning errors
+        }
+    }
 
     const boolFilterElement = (options) => {
         const value = options.value == null ? '' : String(options.value).toLowerCase();
@@ -363,7 +384,7 @@ function App() {
                     value={rows}
                     lazy
                     scrollable
-                    scrollHeight="600px"
+                    scrollHeight="550px"
                     virtualScrollerOptions={{
                         lazy: true,
                         onLazyLoad: onVirtualScroll,
@@ -425,21 +446,23 @@ function App() {
                     <Column
                         field="createdAt"
                         header="Created"
+                        style={{ minWidth: "250px" }}
                         sortable
                         body={dateBodyTemplate("createdAt")}
                         filter
                         dataType="date"
-                        filterElement={dateFilterElement}
+                        filterElement={dateFilterElement("createdAt")}
                     />
 
                     <Column
                         field="updatedAt"
                         header="Updated"
+                        style={{ minWidth: "250px" }}
                         sortable
                         body={dateBodyTemplate("updatedAt")}
                         filter
                         dataType="date"
-                        filterElement={dateFilterElement}
+                        filterElement={dateFilterElement("updatedAt")}
                     />
 
                     <Column
