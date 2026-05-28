@@ -12,7 +12,6 @@ import 'primereact/resources/primereact.min.css';
 const PAGE_SIZE = 50
 const API_URL = 'https://localhost:7233/api/person'
 const DEBOUNCE_DELAY = 300
-const isRowLoaded = (row) => row != null
 const getPageFirst = (first = 0, pageSize = PAGE_SIZE) => Math.floor(first / pageSize) * pageSize
 
 function App() {
@@ -203,19 +202,25 @@ function App() {
     // --------------------------------------------
     // Infinite scroll handler
     // --------------------------------------------
-    const onVirtualScroll = async (event) => {
-        const first = event.first ?? 0;
-        const last = event.last ?? first + PAGE_SIZE;
-        const needLoad = rows.slice(first, last).some((row) => !isRowLoaded(row));
+    const onVirtualScroll = async ({ first = 0, last = first + PAGE_SIZE }) => {
+        const pagesToLoad = new Set();
 
-        if (needLoad) {
-            await loadData({
-                first: getPageFirst(first, PAGE_SIZE),
-                pageSize: PAGE_SIZE,
-                multiSortMeta: lazyState.multiSortMeta,
-                filters: lazyState.filters,
-            });
+        for (let i = first; i < last; i++) {
+            if (rows[i] === null) {
+                pagesToLoad.add(getPageFirst(i, PAGE_SIZE));
+            }
         }
+
+        await Promise.all(
+            [...pagesToLoad].map((pageFirst) =>
+                loadData({
+                    first: pageFirst,
+                    pageSize: PAGE_SIZE,
+                    multiSortMeta: lazyState.multiSortMeta,
+                    filters: lazyState.filters,
+                })
+            )
+        );
     };
 
     // --------------------------------------------
@@ -229,6 +234,7 @@ function App() {
         };
 
         setLazyState(nextState);
+        setRows([]);
 
         await loadData(nextState);
     };
@@ -237,19 +243,19 @@ function App() {
     // Server-side filtering
     // --------------------------------------------
     const onFilter = async (event) => {
-        const nextState = {
-            ...lazyState,
-            first: 0,
-            filters: event.filters,
-        };
-
-        setLazyState(nextState);
-
         if (filterTimeout.current) {
             clearTimeout(filterTimeout.current);
         }
 
         filterTimeout.current = setTimeout(async () => {
+            const nextState = {
+                ...lazyState,
+                first: 0,
+                filters: event.filters,
+            };
+
+            setLazyState(nextState);
+            setRows([]);
             await loadData(nextState);
         }, DEBOUNCE_DELAY);
     };
