@@ -19,23 +19,24 @@ namespace QueryExpress.Web.Api.Controllers
             this.testDataContext = testDataContext;
         }
 
-        [HttpGet]
-        [HttpPost]
-        public IEnumerable<Person> QueryPeople([FromBody] DataQuery? dataQuery)
+        [HttpGet, HttpPost]
+        public async Task<ApiResponse<Person>> QueryPeople([FromBody] DataQuery dataQuery)
         {
-            IQueryable<Tests.Data.Models.Person> query = testDataContext.People.AsQueryable();
+            IQueryable<Tests.Data.Models.Person> query = testDataContext.People.AsQueryable().AsNoTracking();
 
-            if(dataQuery != null)
-            {
-                query = query
-                    .QueryFilter(dataQuery.FilterData)
-                    .QuerySort(dataQuery.SortData)
-                    .QueryPage(dataQuery.PageData);
-            }
+            query = query
+                .QueryFilter(dataQuery.FilterData);
 
-            var results = query
+            var count = await query.CountAsync();
+
+            query = query
+                .QuerySort(dataQuery.SortData)
+                .QueryPage(dataQuery.PageData);
+
+            var result = await query
                 .Select(p => new Person
                 {
+                    Id = p.Id,
                     FirstName = p.FirstName,
                     LastName = p.LastName,
                     Email = p.Email,
@@ -46,9 +47,9 @@ namespace QueryExpress.Web.Api.Controllers
                     IsEligibile = p.IsEligibile,
                     IsUtilized = p.IsUtilized
                 })
-                .ToList();
+                .ToArrayAsync();
 
-            return results;
+            return new ApiResponse<Person> { Data = result, TotalRecords = count };
         }
     }
 }

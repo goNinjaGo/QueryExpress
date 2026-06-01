@@ -11,7 +11,7 @@ http:
     data: |-
       {
         "FilterData": [
-          { "Operation": "Contains", "IsCaseSensitive": false, "Operand": "FirstName", "Value": "jo" }
+          { "Operand": "FirstName", "Filters": [ { "Operation": "Contains", "Value": "jo", "IsCaseSensitive": false } ] }
         ]
       }
   auth: inherit

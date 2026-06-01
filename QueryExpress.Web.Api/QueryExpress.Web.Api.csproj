@@ -15,4 +15,10 @@
     <ProjectReference Include="..\QueryExpress\QueryExpress.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="People.csv">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

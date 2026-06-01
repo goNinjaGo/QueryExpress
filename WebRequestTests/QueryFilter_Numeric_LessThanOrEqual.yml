@@ -11,7 +11,7 @@ http:
     data: |-
       {
         "FilterData": [
-          { "Operation": "LessThanOrEqual", "Operand": "Age", "Value": "30" }
+          { "Operand": "Age", "Filters": [ { "Operation": "LessThanOrEqual", "Value": "30" } ] }
         ]
       }
   auth: inherit

@@ -11,7 +11,7 @@ http:
     data: |-
       {
         "FilterData": [
-          { "Operation": "Equals", "Operand": "IsUtilized", "Value": "True" }
+          { "Operand": "IsUtilized", "Filters": [ { "Operation": "Equals", "Value": "True" } ] }
         ]
       }
   auth: inherit

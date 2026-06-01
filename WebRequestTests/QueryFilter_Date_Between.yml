@@ -11,7 +11,7 @@ http:
     data: |-
       {
         "FilterData": [
-          { "Operation": "Between", "Operand": "CreatedAt", "Value": "2019-01-01", "SecondaryValue": "2020-12-31" }
+          { "Operand": "CreatedAt", "Filters": [ { "Operation": "Between", "Value": "2019-01-01", "SecondaryValue": "2020-12-31" } ] }
         ]
       }
   auth: inherit

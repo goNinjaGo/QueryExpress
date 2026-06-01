@@ -1,355 +1,564 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
-import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  getFilteredRowModel,
-} from '@tanstack/react-table'
-import { DateTimePicker } from 'react-datetime-picker'
-import { TriStateCheckbox } from 'primereact/tristatecheckbox'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { DataTable } from "primereact/datatable";
+import { Column } from "primereact/column";
+import { Calendar } from "primereact/calendar";
+import { Dropdown } from "primereact/dropdown";
+import { InputNumber } from "primereact/inputnumber";
+import { FilterMatchMode, FilterOperator } from 'primereact/api';
+import { Skeleton } from 'primereact/skeleton';
 import './App.css'
-import 'react-datetime-picker/dist/DateTimePicker.css';
-import 'react-calendar/dist/Calendar.css';
-import 'react-clock/dist/Clock.css';
 import 'primereact/resources/themes/lara-dark-blue/theme.css';
 import 'primereact/resources/primereact.min.css';
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 50
+const API_URL = 'https://localhost:7233/api/person'
+const getPageFirst = (first = 0, pageSize = PAGE_SIZE) => Math.floor(first / pageSize) * pageSize
+const booleanFilterOptions = [
+    { label: 'Yes', value: 'true' },
+    { label: 'No', value: 'false' },
+]
 
 function App() {
-  const [data, setData] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-  const [pageNum, setPageNum] = useState(1)
-  const [hasMore, setHasMore] = useState(true)
+    const [rows, setRows] = useState([]);
+    const [loading, setLoading] = useState(false)
+    const [error, setError] = useState(null)
+    const [totalRecords, setTotalRecords] = useState(0);
 
-  const [sorting, setSorting] = useState([]) // [{id, desc}]
-  const [filters, setFilters] = useState({}) // {columnId: value}
+    const [lazyState, setLazyState] = useState({
+        first: 0,
+        pageSize: PAGE_SIZE,
+        multiSortMeta: [],
+        filters: {
+            firstName: {
+                operator: FilterOperator.AND,
+                constraints: [
+                    {
+                        value: null,
+                        matchMode: FilterMatchMode.CONTAINS,
+                    },
+                ],
+            },
+            lastName: {
+                operator: FilterOperator.AND,
+                constraints: [
+                    {
+                        value: null,
+                        matchMode: FilterMatchMode.CONTAINS,
+                    },
+                ],
+            },
+            email: {
+                operator: FilterOperator.AND,
+                constraints: [
+                    {
+                        value: null,
+                        matchMode: FilterMatchMode.CONTAINS,
+                    },
+                ],
+            },
+            age: {
+                operator: FilterOperator.AND,
+                constraints: [
+                    {
+                        value: null,
+                        matchMode: FilterMatchMode.EQUALS,
+                    },
+                ],
+            },
+            litersUsed: {
+                operator: FilterOperator.AND,
+                constraints: [
+                    {
+                        value: null,
+                        matchMode: FilterMatchMode.EQUALS,
+                    },
+                ],
+            },
+            createdAt: {
+                operator: FilterOperator.AND,
+                constraints: [
+                    {
+                        value: null,
+                        matchMode: FilterMatchMode.DATE_IS,
+                    },
+                ],
+            },
+            updatedAt: {
+                operator: FilterOperator.AND,
+                constraints: [
+                    {
+                        value: null,
+                        matchMode: FilterMatchMode.DATE_IS,
+                    },
+                ],
+            },
+            isEligibile: {value: null, matchMode: FilterMatchMode.EQUALS },
+            isUtilized:  { value: null, matchMode: FilterMatchMode.EQUALS },
+        },
+    });
 
-  const tableColumns = useMemo(
-    () => [
-      { accessorKey: 'firstName', header: 'First Name', dataType: 'string' },
-      { accessorKey: 'lastName', header: 'Last Name', dataType: 'string' },
-      { accessorKey: 'email', header: 'Email', dataType: 'string' },
-      { accessorKey: 'age', header: 'Age', dataType: 'number' },
-      { accessorKey: 'litersUsed', header: 'Liters Used', dataType: 'number' },
-      { accessorKey: 'createdAt', header: 'Created At', dataType: 'date' },
-      { accessorKey: 'updatedAt', header: 'Updated At', dataType: 'date' },
-      { accessorKey: 'isEligibile', header: 'Is Eligible', dataType: 'boolean' },
-      { accessorKey: 'isUtilized', header: 'Is Utilized', dataType: 'boolean' },
-    ],
-    []
-  )
+    const abortRef = useRef(null);
+    const filterTimeout = useRef(null);
+    const initialLazyState = useRef(lazyState);
 
-  const table = useReactTable({
-    data,
-    columns: tableColumns,
-    state: { sorting },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    manualPagination: true,
-    manualSorting: true,
-    manualFiltering: true,
-    pageCount: -1,
-  })
+    // --------------------------------------------
+    // Fetch data from server
+    // --------------------------------------------
+    const loadData = useCallback(async ({
+        first,
+        pageSize,
+        multiSortMeta,
+        filters,
+    }) => {
+        try {
+            setLoading(true);
 
-  // Fetch page of data from server using DataQuery POST body
-  const fetchPage = useCallback(
-    async (pNum) => {
-      setLoading(true)
-      const filterData = []
-      for (const col of tableColumns) {
-        const key = col.accessorKey
-        const f = filters[key]
-        if (!f) continue
-        // include filter entry even if value is empty when an operator was explicitly chosen
-        filterData.push({
-          Operand: key,
-          Value: f.value ?? '',
-          SecondaryValue: f.secondaryValue ?? null,
-          Operation: f.op ?? defaultOpForType(col.dataType),
-          IsCaseSensitive: f.isCaseSensitive ?? false,
-        })
-      }
-
-      const dq = {
-        PageData: { PageNum: pNum, PageSize: PAGE_SIZE },
-        SortData: (sorting || []).map((s) => ({ ColumnName: s.id, SortDirection: s.desc ? 'Desc' : 'Asc' })),
-        FilterData: filterData,
-      }
-
-      // Debug the outgoing DataQuery
-      console.debug('Sending DataQuery:', dq)
-      // Map operation names to enum numeric values to avoid string enum mapping issues
-      function opNameToEnumValue(name) {
-        switch (name) {
-          case 'Equals': return 0
-          case 'NotEquals': return 1
-          case 'Between': return 2
-          case 'LessThan': return 3
-          case 'LessThanOrEqual': return 4
-          case 'GreaterThan': return 5
-          case 'GreaterThanOrEqual': return 6
-          case 'Contains': return 7
-          case 'DoesNotContain': return 8
-          case 'StartsWith': return 9
-          case 'EndsWith': return 10
-          default: return 0
-        }
-      }
-
-      // convert Operation strings to numeric enum values for reliable deserialization
-      dq.FilterData = dq.FilterData.map(fd => ({
-        ...fd,
-        Operation: opNameToEnumValue(fd.Operation)
-      }))
-
-      try {
-          const res = await fetch('https://localhost:7233/api/person', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(dq),
-        })
-        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
-        const items = await res.json()
-
-        if (pNum === 1) setData(items)
-        else {
-          // deduplicate by simple key combination to avoid repeats
-          setData((prev) => {
-            const combined = [...prev, ...items]
-            const seen = new Set()
-            const dedup = []
-            for (const it of combined) {
-              const key = `${it.firstName ?? it.FirstName ?? ''}|${it.lastName ?? it.LastName ?? ''}|${it.email ?? it.Email ?? ''}|${it.age ?? it.Age ?? ''}`
-              if (!seen.has(key)) {
-                seen.add(key)
-                dedup.push(it)
-              }
+            // cancel previous request
+            if (abortRef.current) {
+                abortRef.current.abort();
             }
-            return dedup
-          })
+
+            abortRef.current = new AbortController();
+
+            const filterData = [];
+            Object.entries(filters || {}).forEach(([key, f]) => {
+                if (!f) return;
+
+                if (f.matchMode !== undefined) {
+                    const value = normalizeFilterValue(f.value);
+                    if (value === null) {
+                        return;
+                    };
+                    filterData.push({
+                        Operand: key,
+                        Operator: 'And',
+                        Filters: [
+                            {
+                                Value: value,
+                                Operation: opNameToEnumValue(f.matchMode ?? 'equals'),
+                            },
+                        ],
+                    });
+                }
+                else {
+                    const filterGroup = {
+                        Operand: key,
+                        Operator: conditionOperatorToEnumValue(f.operator),
+                        Filters: [],
+                    };
+
+                    for (const constraint of f.constraints) {
+                        const value = normalizeFilterValue(constraint.value);
+                        if (value === null) {
+                            continue;
+                        }
+                        filterGroup.Filters.push({
+                            Value: value,
+                            Operation: opNameToEnumValue(constraint.matchMode ?? 'equals'),
+                        });
+                    }
+
+                    if (filterGroup.Filters.length > 0) {
+                        filterData.push(filterGroup);
+                    }
+                }                
+            });
+
+            const pageFirst = getPageFirst(first, pageSize);
+
+            const body = {
+                pageData: { pageNum: Math.floor(pageFirst / pageSize) + 1, pageSize },
+                sortData: (multiSortMeta || []).map((s) => ({ columnName: s.field, sortDirection: s.order === 1 ? 'Asc' : 'Desc' })),
+                filterData,
+            };
+
+            const response = await fetch(
+                API_URL,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                    signal: abortRef.current.signal,
+                }
+            );
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.title || result.detail || `Request failed with status ${response.status}`);
+            }
+
+            setTotalRecords(result.totalRecords);
+
+            setRows((prev) => {
+                const virtualRows =
+                    prev.length === result.totalRecords
+                        ? [...prev]
+                        : Array.from({ length: result.totalRecords }, () => null);
+
+                const resultData = result.data ?? [];
+
+                for (let i = 0; i < resultData.length; i++) {
+                    virtualRows[pageFirst + i] = resultData[i];
+                }
+
+                return virtualRows;
+            });
+        } catch (err) {
+            if (err.name !== "AbortError") {
+                setError(err.message || "Error fetching data");
+            }
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    // Initial load
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            loadData(initialLazyState.current);
+        }, 0);
+
+        return () => clearTimeout(timeoutId);
+    }, [loadData]);
+
+    // --------------------------------------------
+    // Infinite scroll handler
+    // --------------------------------------------
+    const onVirtualScroll = async ({ first = 0, last = first + PAGE_SIZE }) => {
+        const pagesToLoad = new Set();
+
+        for (let i = first; i < last; i++) {
+            if (rows[i] === null) {
+                pagesToLoad.add(getPageFirst(i, PAGE_SIZE));
+            }
         }
 
-        setHasMore(items.length >= PAGE_SIZE)
-        setError(null)
-      } catch (err) {
-        setError(err.message)
-      } finally {
-        setLoading(false)
-      }
-    },
-    [sorting, filters]
-  )
+        await Promise.all(
+            [...pagesToLoad].map((pageFirst) =>
+                loadData({
+                    first: pageFirst,
+                    pageSize: PAGE_SIZE,
+                    multiSortMeta: lazyState.multiSortMeta,
+                    filters: lazyState.filters,
+                })
+            )
+        );
+    };
 
-  // Reset and fetch when sorting or filters change
-  useEffect(() => {
-    setPageNum(1)
-    setData([])
-    setHasMore(true)
-    fetchPage(1)
-  }, [sorting, filters, fetchPage])
+    // --------------------------------------------
+    // Server-side sorting
+    // --------------------------------------------
+    const onSort = async (event) => {
+        const nextState = {
+            ...lazyState,
+            first: 0,
+            multiSortMeta: event.multiSortMeta,
+        };
 
-  useEffect(() => {
-    if (pageNum === 1) return
-    fetchPage(pageNum)
-  }, [pageNum, fetchPage])
+        setLazyState(nextState);
+        setRows([]);
 
-  // Virtualization for infinite scroll
-  // infinite scroll handled by pageNum increments; rendering without virtualization for correct alignment
+        await loadData(nextState);
+    };
 
-  return (
-    <div className="app-container">
-      <h1>People</h1>
+    // --------------------------------------------
+    // Server-side filtering
+    // --------------------------------------------
+    const onFilter = async (event) => {
+        if (filterTimeout.current) {
+            clearTimeout(filterTimeout.current);
+        }
 
-      <div style={{ height: 8 }} />
+        const nextState = {
+            ...lazyState,
+            first: 0,
+            filters: event.filters,
+        };
 
-      {error && <div className="error">Error: {error}</div>}
+        setLazyState(nextState);
+        setRows([]);
+        await loadData(nextState);
+    };
 
-      <div className="grid-viewport">
-        <table className="data-grid">
-          <thead>
-            {table.getHeaderGroups().map((hg) => (
-              <tr key={hg.id}>
-                {hg.headers.map((h) => {
-                  const colId = h.column.id
-                  const colDef = tableColumns.find((c) => c.accessorKey === colId) || {}
-                  const f = filters[colId] || { op: defaultOpForType(colDef.dataType), value: '', secondaryValue: '' }
-                  return (
-                    <th key={h.id}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <div className="column-header-title">{h.column.columnDef.header}</div>
-                        <div
-                          style={{ cursor: 'pointer', marginLeft: 8 }}
-                          onClick={() => {
-                            const id = colId
-                            const current = sorting.find((s) => s.id === id)
-                            if (!current) setSorting([{ id, desc: false }])
-                            else if (!current.desc) setSorting([{ id, desc: true }])
-                            else setSorting([])
-                          }}
-                        >
-                          {sorting.find((s) => s.id === h.column.id)
-                            ? sorting.find((s) => s.id === h.column.id).desc
-                              ? ' 🔽'
-                              : ' 🔼'
-                            : ' ⇅'}
-                        </div>
-                      </div>
-                      <div className="filter-in-header">
-                        <select
-                          value={f.op}
-                          onChange={(e) =>
-                            setFilters((fs) => ({ ...fs, [colId]: { ...(fs[colId] || {}), op: e.target.value } }))
-                          }
-                        >
-                          {operatorOptionsForType(colDef.dataType).map((op) => (
-                            <option key={op} value={op}>
-                              {op}
-                            </option>
-                          ))}
-                        </select>
-                        {f.op === 'Between' ? (
-                          <>
-                            {renderFilterInput(colDef.dataType, f.value ?? '', (val) =>
-                              setFilters((fs) => ({ ...fs, [colId]: { ...(fs[colId] || {}), value: val } }))
-                            )}
-                            {renderFilterInput(colDef.dataType, f.secondaryValue ?? '', (val) =>
-                              setFilters((fs) => ({ ...fs, [colId]: { ...(fs[colId] || {}), secondaryValue: val } }))
-                            )}
-                          </>
-                        ) : (
-                          renderFilterInput(colDef.dataType, f.value ?? '', (val) =>
-                            setFilters((fs) => ({ ...fs, [colId]: { ...(fs[colId] || {}), value: val } }))
-                          )
-                        )}
-                      </div>
-                    </th>
-                  )
-                })}
-              </tr>
-            ))}
-          </thead>
+    // --------------------------------------------
+    // Templates
+    // --------------------------------------------
+    const formatDate = (value) => {
+        if (!value) return "";
 
-          <tbody>
-            {data.map((item, idx) => (
-              <tr key={idx}>
-                {tableColumns.map((c) => (
-                  <td key={c.accessorKey}>{formatCell(item, c.accessorKey)}</td>
-                ))}
-              </tr>
-            ))}
-            {loading && (
-              <tr>
-                <td colSpan={tableColumns.length} className="loading-row">
-                  Loading...
-                </td>
-              </tr>
-            )}
-            {!loading && !hasMore && data.length === 0 && (
-              <tr>
-                <td colSpan={tableColumns.length} className="loading-row">
-                  No results
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+        return new Intl.DateTimeFormat("en-US", {
+            dateStyle: "medium",
+            timeStyle: "short",
+        }).format(new Date(value));
+    };
 
-      {loading && <div className="loading-indicator">Loading...</div>}
-    </div>
-  )
-}
+    const dateBodyTemplate = (field) => (rowData) => {
+        if (!rowData) {
+            return loadingTemplate();
+        }
+        return formatDate(rowData[field]);
+    };
 
-function formatCell(item, key) {
-  if (!item) return ''
-  const v = item[key]
-  if (v === null || v === undefined) return ''
-  if (typeof v === 'boolean') return v ? 'Yes' : 'No'
-  // format dates
-  const dateKeys = ['createdAt', 'CreatedAt', 'updatedAt', 'UpdatedAt']
-  if (dateKeys.includes(key) || /^[0-9]{4}-[0-9]{2}-[0-9]{2}T/.test(String(v))) {
-    const d = new Date(v)
-    if (!isNaN(d.getTime())) {
-      return formatDateMMDD(d)
+    const booleanBodyTemplate = (field) => (rowData) => {
+        if (!rowData) {
+            return loadingTemplate();
+        }
+        if (rowData[field] === true) {
+            return 'Yes'
+        }
+        if (rowData[field] === false) {
+            return 'No';
+        }
+
+        return '';
+    };
+
+    const textBodyTemplate = (field) => (rowData) => {
+        if (!rowData) {
+            return loadingTemplate();
+        }
+
+        return rowData[field] ?? '';
+    };
+
+    const dateFilterElement = (field) => (options) => {
+        return (
+            <Calendar
+                value={options.value}
+                onChange={(e) => options.filterCallback(e.value)}
+                showTime
+                hourFormat="12"
+                appendTo={document.body}
+                inputId={`calendar-input-${field}`}
+                panelClassName={`calendar-overlay-${field}`}
+                onShow={() => positionCalendarOverlay(field)}
+            />
+        );
+    };
+
+    const positionCalendarOverlay = (colId) => {
+        try {
+            requestAnimationFrame(() => {
+                const input = document.getElementById(`calendar-input-${colId}`)
+                const panel = document.querySelector(`.calendar-overlay-${colId}`)
+                if (!input || !panel) return
+                const rect = input.getBoundingClientRect()
+                const panelRect = panel.getBoundingClientRect()
+                panel.style.position = 'absolute'
+                panel.style.left = `${rect.left + window.scrollX - panelRect.width}px`
+                panel.style.top = `${rect.top + window.scrollY + rect.height / 2 - panelRect.height / 2}px`
+            })
+        } catch {
+            // ignore positioning errors
+        }
     }
-  }
-  return String(v)
+
+    const boolFilterElement = (options) => {
+        const value = options.value == null ? '' : String(options.value).toLowerCase();
+
+        return (
+            <Dropdown
+                value={value}
+                options={booleanFilterOptions}
+                onChange={(e) => options.filterCallback(e.value === '' ? null : e.value === 'true')}
+            />
+        );
+    };
+
+    const numericFilterElement = ({ maxFractionDigits = 0 } = {}) => (options) => {
+        return (
+            <InputNumber
+                value={options.value}
+                onValueChange={(e) => options.filterCallback(e.value)}
+                useGrouping={false}
+                maxFractionDigits={maxFractionDigits}
+            />
+        );
+    };
+
+    const loadingTemplate = () => {
+        return (
+            <div
+                className="flex align-items-center"
+                style={{
+                    height: '17px',
+                    flexGrow: '1',
+                    overflow: 'hidden',
+                }}
+            >
+                <Skeleton width="60%" height="1rem" />
+            </div>
+        );
+    };
+    
+
+    return (
+        <div className="app-container">
+            <h1>People</h1>
+
+            <div style={{ height: 8 }} />
+
+            {error && <div className="error">Error: {error}</div>}
+
+            <div className="grid-viewport">
+                <DataTable
+                    className="data-grid"
+                    value={rows}
+                    lazy
+                    scrollable
+                    scrollHeight="550px"
+                    virtualScrollerOptions={{
+                        lazy: true,
+                        onLazyLoad: onVirtualScroll,
+                        itemSize: 35,
+                        delay: 150,
+                        showLoader: false
+                    }}
+                    totalRecords={totalRecords}
+                    filterDisplay="menu"
+                    filters={lazyState.filters}
+                    onFilter={onFilter}
+                    sortMode="multiple"
+                    multiSortMeta={lazyState.multiSortMeta}
+                    onSort={onSort}
+                    removableSort
+                >
+                    <Column
+                        field="firstName"
+                        header="First Name"
+                        sortable
+                        filter
+                        body={textBodyTemplate("firstName")}
+                    />
+
+                    <Column
+                        field="lastName"
+                        header="Last Name"
+                        sortable
+                        filter
+                        body={textBodyTemplate("lastName")}
+                    />
+
+                    <Column
+                        field="email"
+                        header="Email"
+                        sortable
+                        filter
+                        body={textBodyTemplate("email")}
+                    />
+
+                    <Column
+                        field="age"
+                        header="Age"
+                        sortable
+                        filter
+                        dataType="numeric"
+                        body={textBodyTemplate("age")}
+                        filterElement={numericFilterElement()}
+                    />
+
+                    <Column
+                        field="litersUsed"
+                        header="Liters Used"
+                        sortable
+                        filter
+                        dataType="numeric"
+                        body={textBodyTemplate("litersUsed")}
+                        filterElement={numericFilterElement({ maxFractionDigits: 2 })}
+                    />
+
+                    <Column
+                        field="createdAt"
+                        header="Created"
+                        style={{ minWidth: "250px" }}
+                        sortable
+                        body={dateBodyTemplate("createdAt")}
+                        filter
+                        dataType="date"
+                        filterElement={dateFilterElement("createdAt")}
+                    />
+
+                    <Column
+                        field="updatedAt"
+                        header="Updated"
+                        style={{ minWidth: "250px" }}
+                        sortable
+                        body={dateBodyTemplate("updatedAt")}
+                        filter
+                        dataType="date"
+                        filterElement={dateFilterElement("updatedAt")}
+                    />
+
+                    <Column
+                        field="isEligibile"
+                        header="Eligible"
+                        sortable
+                        body={booleanBodyTemplate("isEligibile")}
+                        filter
+                        dataType="boolean"
+                        filterElement={boolFilterElement}
+                    />
+
+                    <Column
+                        field="isUtilized"
+                        header="Utilized"
+                        sortable
+                        body={booleanBodyTemplate("isUtilized")}
+                        filter
+                        dataType="boolean"
+                        filterElement={boolFilterElement}
+                    />
+                </DataTable>
+
+                {loading && <div className="loading-indicator">Loading...</div>}
+            </div>
+        </div>
+    )
 }
 
 export default App
 
-function defaultOpForType(type) {
-  switch (type) {
-    case 'string':
-      return 'Contains'      
-    default:
-      return 'Equals'
-  }
+function normalizeFilterValue(value) {
+    if (value === null || value === undefined || value === '') {
+        return null;
+    }
+
+    if (typeof value === 'boolean') {
+        return value ? 'True' : 'False';
+    }
+
+    if (value instanceof Date) {
+        return value.toISOString();
+    }
+
+    return String(value);
 }
 
-function operatorOptionsForType(type) {
-  switch (type) {
-    case 'number':
-    case 'date':
-      return ['Equals', 'NotEquals', 'LessThan', 'LessThanOrEqual', 'GreaterThan', 'GreaterThanOrEqual', 'Between']
-    case 'boolean':
-      return ['Equals', 'NotEquals']
-    default:
-      return ['Contains', 'DoesNotContain', 'StartsWith', 'EndsWith', 'Equals', 'NotEquals']
-  }
+function conditionOperatorToEnumValue(operator) {
+    switch (operator) {
+        case 'or': return 'Or'
+        case 'and':
+        default: return 'And'
+    }
 }
 
-function renderFilterInput(type, value, onChange) {
-  if (type === 'number') {
-    return (
-      <input
-        type="number"
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value)}
-        style={{ width: 100 }}
-      />
-    )
-  }
-  if (type === 'date') {
-    const v = value ? new Date(value) : null
-    return (
-      <DateTimePicker
-        value={v}
-        onChange={(dt) => onChange(dt ? dt.toISOString() : '')}
-        format="MM/dd/yyyy HH:mm"
-      />
-    )
-  }
-  if (type === 'boolean') {
-    // TriStateCheckbox accepts true / false / null (indeterminate)
-    const normalized = value === true || value === 'true' ? true : value === false || value === 'false' ? false : null
-    return (
-      <TriStateCheckbox
-        value={normalized}
-        onChange={(e) => onChange(e.value + '')}
-      />
-    )
-  }
-
-  return (
-    <input
-      value={value ?? ''}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder="..."
-      style={{ width: 100 }}
-    />
-  )
-}
-
-function formatDateMMDD(d) {
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  const yyyy = d.getFullYear()
-  const hh = String(d.getHours()).padStart(2, '0')
-  const min = String(d.getMinutes()).padStart(2, '0')
-  return `${mm}/${dd}/${yyyy} ${hh}:${min}`
+function opNameToEnumValue(name) {
+    switch (name) {
+        case 'equals': return 'Equals'
+        case 'notEquals': return 'NotEquals'
+        case 'lt': return 'LessThan'
+        case 'lte': return 'LessThanOrEqual'
+        case 'gt': return 'GreaterThan'
+        case 'gte': return 'GreaterThanOrEqual'
+        case 'contains': return 'Contains'
+        case 'notContains': return 'DoesNotContain'
+        case 'startsWith': return 'StartsWith'
+        case 'endsWith': return 'EndsWith'
+        case 'dateIs': return 'Equals'
+        case 'dateIsNot': return 'NotEquals'
+        case 'dateBefore': return 'LessThan'
+        case 'dateAfter': return 'GreaterThan'
+        default: return 'Equals'
+    }
 }
