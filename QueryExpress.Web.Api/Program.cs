@@ -40,7 +40,7 @@ namespace QueryExpress.Web.Api
                 options.UseInMemoryDatabase("PeopleDb");
                 options.UseSeeding((ctx, _) =>
                 {
-                    SeedDataFromCsv().ForEach(p =>
+                    SeedData(builder).ForEach(p =>
                     {
                         ctx.Set<Person>().Add(p);
                     });
@@ -74,12 +74,20 @@ namespace QueryExpress.Web.Api
             app.Run();
         }
 
-        public static List<Person> SeedDataFromCsv()
+        public static List<Person> SeedData(WebApplicationBuilder builder)
         {
-            using var reader = new StreamReader($"{Environment.CurrentDirectory}\\People.csv");
-            using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
-            var records = csv.GetRecords<Person>();
-            return records.ToList();
+            if(builder.Configuration.GetValue<bool>("AppSettings:UseSmallDataSet"))
+            {
+                return Person.GetTestPeople();
+            }
+            else
+            {
+                using var reader = new StreamReader($"{Environment.CurrentDirectory}\\People.csv");
+                using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
+                var records = csv.GetRecords<Person>();
+                return records.ToList();
+            }
+            
         }
     }
 }

@@ -11,7 +11,7 @@ http:
     data: |-
       {
         "FilterData": [
-          { "Operand": "UpdatedAt", "Filters": [ { "Operation": "LessThan", "Value": "2023-01-01T00:00:00Z" } ] }
+          { "Operand": "UpdatedAt", "Filters": [ { "Operation": "LessThan", "Value": "2045-01-01T00:00:00Z" } ] }
         ]
       }
   auth: inherit

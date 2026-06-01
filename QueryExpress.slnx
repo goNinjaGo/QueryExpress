@@ -15,6 +15,9 @@
     <File Path="WebRequestTests/QueryFilter_Date_LessThan.yml" />
     <File Path="WebRequestTests/QueryFilter_Date_LessThanOrEqual.yml" />
     <File Path="WebRequestTests/QueryFilter_Date_NotEquals.yml" />
+    <File Path="WebRequestTests/QueryFilter_HandlesAndCondition.yml" />
+    <File Path="WebRequestTests/QueryFilter_HandlesOrCondition.yml" />
+    <File Path="WebRequestTests/QueryFilter_HandlesMultipleColumns.yml" />
     <File Path="WebRequestTests/QueryFilter_NonSearchableColumn.yml" />
     <File Path="WebRequestTests/QueryFilter_Numeric_Between.yml" />
     <File Path="WebRequestTests/QueryFilter_Numeric_Equals.yml" />
