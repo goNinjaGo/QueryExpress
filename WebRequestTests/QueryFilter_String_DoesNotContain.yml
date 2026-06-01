@@ -11,7 +11,7 @@ http:
     data: |-
       {
         "FilterData": [
-          { "Operation": "DoesNotContain", "Operand": "FirstName", "Value": "Jo" }
+          { "Operand": "FirstName", "Filters": [ { "Operation": "DoesNotContain", "Value": "Jo" } ] }
         ]
       }
   auth: inherit

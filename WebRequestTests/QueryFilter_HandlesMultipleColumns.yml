@@ -1,7 +1,7 @@
 info:
-  name: QueryFilter_Numeric_Between
+  name: QueryFilter_HandlesMultipleColumns
   type: http
-  seq: 13
+  seq: 50
 
 http:
   method: GET
@@ -11,7 +11,8 @@ http:
     data: |-
       {
         "FilterData": [
-          { "Operand": "LitersUsed", "Filters": [ { "Operation": "Between", "Value": "5", "SecondaryValue": "11" } ] }
+          { "Operand": "IsUtilized", "Filters": [ { "Operation": "Equals", "Value": "True" } ] },
+          { "Operand": "LastName", "Filters": [ { "Operation": "Equals", "Value": "Doe" } ] }
         ]
       }
   auth: inherit

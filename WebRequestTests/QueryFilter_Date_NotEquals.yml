@@ -11,7 +11,7 @@ http:
     data: |-
       {
         "FilterData": [
-          { "Operation": "NotEquals", "Operand": "CreatedAt", "Value": "2020-01-01" }
+          { "Operand": "CreatedAt", "Filters": [ { "Operation": "NotEquals", "Value": "2020-01-01" } ] }
         ]
       }
   auth: inherit

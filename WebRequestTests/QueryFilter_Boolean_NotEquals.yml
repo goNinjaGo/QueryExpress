@@ -11,7 +11,7 @@ http:
     data: |-
       {
         "FilterData": [
-          { "Operation": "NotEquals", "Operand": "IsEligibile", "Value": "True" }
+          { "Operand": "IsEligibile", "Filters": [ { "Operation": "NotEquals", "Value": "True" } ] }
         ]
       }
   auth: inherit
