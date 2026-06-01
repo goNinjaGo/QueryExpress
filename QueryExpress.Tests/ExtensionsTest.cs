@@ -114,7 +114,6 @@ namespace QueryExpress.Tests
             using var ctx = new TestDataContext(options);
             Seed(ctx);
 
-            // Ensure null Email values don't cause exceptions when running string filters
             var result = ctx.People.AsQueryable().QueryFilter(new FilterData { Operand = "Email", Filters = new[] { new Filter { Operation = Operation.Contains, Value = "example" } } }).ToList();
             Assert.AreEqual(1, result.Count);
             Assert.AreEqual("john@example.com", result[0].Email);
@@ -231,7 +230,6 @@ namespace QueryExpress.Tests
             using var ctx = new TestDataContext(options);
             Seed(ctx);
 
-            // Ensure nullable numeric (LitersUsed) doesn't cause exceptions
             var result = ctx.People.AsQueryable().QueryFilter(new FilterData { Operand = "LitersUsed", Filters = new[] { new Filter { Operation = Operation.GreaterThan, Value = "6" } } }).ToList();
             Assert.AreEqual(1, result.Count);
         }
@@ -246,7 +244,7 @@ namespace QueryExpress.Tests
             var intResult = ctx.People.AsQueryable().QueryFilter(new FilterData { Operand = "Age", Filters = new[] { new Filter { Operation = Operation.Equals, Value = "25" } } }).ToList();
             Assert.AreEqual(1, intResult.Count);
 
-            var decimalResult = ctx.People.AsQueryable().QueryFilter(new FilterData { Operand = "LitersUsed", Filters = new[] { new Filter { Operation = Operation.Equals, Value = "5" } } }).ToList();
+            var decimalResult = ctx.People.AsQueryable().QueryFilter(new FilterData { Operand = "LitersUsed", Filters = new[] { new Filter { Operation = Operation.Equals, Value = "10.5" } } }).ToList();
             Assert.AreEqual(1, decimalResult.Count);
         }
 
@@ -335,9 +333,7 @@ namespace QueryExpress.Tests
             using var ctx = new TestDataContext(options);
             Seed(ctx);
 
-            // Ensure nullable UpdatedAt doesn't break date filters
             var result = ctx.People.AsQueryable().QueryFilter(new FilterData { Operand = "UpdatedAt", Filters = new[] { new Filter { Operation = Operation.LessThan, Value = DateTimeOffset.UtcNow.ToString() } } }).ToList();
-            // All records with UpdatedAt that are not null should return
             Assert.AreEqual(2, result.Count);
         }
 
@@ -352,7 +348,7 @@ namespace QueryExpress.Tests
             var dtResult = ctx.People.AsQueryable().QueryFilter(new FilterData { Operand = "CreatedAt", Filters = new[] { new Filter { Operation = Operation.Equals, Value = "2021-01-01" } } }).ToList();
             Assert.AreEqual(1, dtResult.Count);
 
-            var dtoResult = ctx.People.AsQueryable().QueryFilter(new FilterData { Operand = "UpdatedAt", Filters = new[] { new Filter { Operation = Operation.Equals, Value = DateTimeOffset.UtcNow.ToString() } } }).ToList();
+            var dtoResult = ctx.People.AsQueryable().QueryFilter(new FilterData { Operand = "UpdatedAt", Filters = new[] { new Filter { Operation = Operation.LessThanOrEqual, Value = DateTimeOffset.UtcNow.ToString() } } }).ToList();
             Assert.IsTrue(dtoResult.Count >= 0);
         }
 
@@ -388,6 +384,61 @@ namespace QueryExpress.Tests
 
             var result = ctx.People.AsQueryable().QueryFilter(new FilterData { Operand = "IsUtilized", Filters = new[] { new Filter { Operation = Operation.Equals, Value = "True" } } }).ToList();
             Assert.AreEqual(1, result.Count);
+        }
+
+        // Multi-condiiton tests
+        [TestMethod]
+        public void QueryFilter_HandlesMultipleColumns()
+        {
+            var options = CreateOptions();
+            using var ctx = new TestDataContext(options);
+            Seed(ctx);
+
+            var result = ctx.People.AsQueryable().QueryFilter(new FilterData[] {
+                new FilterData { Operand = "IsUtilized", Filters = new[] { new Filter { Operation = Operation.Equals, Value = "True" } } },
+                new FilterData { Operand = "LastName", Filters = new[] { new Filter { Operation = Operation.Equals, Value = "Doe" } } }
+            }).ToList();
+            Assert.AreEqual(1, result.Count);
+        }
+
+        [TestMethod]
+        public void QueryFilter_HandlesOrCondition()
+        {
+            var options = CreateOptions();
+            using var ctx = new TestDataContext(options);
+            Seed(ctx);
+
+            var result = ctx.People.AsQueryable().QueryFilter(new FilterData {
+                Operand = "FirstName",
+                Operator = ConditionOperator.Or,
+                Filters = new Filter[] {
+                    new() { Operation = Operation.Equals, Value = "John" },
+                    new() { Operation = Operation.Equals, Value = "Jane" }
+                }
+            }).ToList();
+
+            Assert.AreEqual(2, result.Count); // John and Jane
+        }
+
+        [TestMethod]
+        public void QueryFilter_HandlesAndCondition()
+        {
+            var options = CreateOptions();
+            using var ctx = new TestDataContext(options);
+            Seed(ctx);
+
+            var result = ctx.People.AsQueryable().QueryFilter(new FilterData
+            {
+                Operand = "Age",
+                Operator = ConditionOperator.And,
+                Filters = new Filter[] {
+                    new() { Operation = Operation.LessThan, Value = "40" },
+                    new() { Operation = Operation.GreaterThan, Value = "25" }
+                }
+            }).ToList();
+
+            Assert.AreEqual(1, result.Count);
+            Assert.AreEqual(30, result[0].Age);
         }
 
         // Sort tests
