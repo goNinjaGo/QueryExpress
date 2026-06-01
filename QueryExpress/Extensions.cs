@@ -12,11 +12,14 @@ namespace QueryExpress
     {
         public static IQueryable<T> QuerySort<T>(this IQueryable<T> query, IEnumerable<SortData> sortExpressions)
         {
-            ParameterExpression param = Expression.Parameter(typeof(T));
+            var type = typeof(T);
+            ParameterExpression param = Expression.Parameter(type);
             for (int i = 0; i < sortExpressions.Count(); i++)
             {
                 var index = i;
-                MemberExpression prop = Expression.PropertyOrField(param, sortExpressions.ElementAt(index).ColumnName);
+                var colName = sortExpressions.ElementAt(index).ColumnName;
+                MemberExpression prop = Expression.PropertyOrField(param, colName);
+                ValidateSearchable(type, prop, colName);
                 LambdaExpression sort = Expression.Lambda(prop, param);
 
                 var functionName = index == 0 ? "OrderBy" : "ThenBy";
@@ -82,11 +85,16 @@ namespace QueryExpress
 
         private static void ValidateSearchable(Type type, MemberExpression prop, string operand)
         {
-            var metadataType = type.GetCustomAttributes(typeof(MetadataTypeAttribute), true)
-                .OfType<MetadataTypeAttribute>().FirstOrDefault();
+            bool throwsException = prop.Member.GetCustomAttribute<NonSearchableAttribute>(inherit: true) != null;
+            if(!throwsException) {
+                var metadataType = type.GetCustomAttributes(typeof(MetadataTypeAttribute), true)
+                    .OfType<MetadataTypeAttribute>().FirstOrDefault();
 
-            if (prop.Member.GetCustomAttribute<NonSearchableAttribute>(inherit: true) != null
-                || metadataType?.MetadataClassType.GetProperty(operand)?.GetCustomAttribute<NonSearchableAttribute>(inherit: true) != null)
+                throwsException = metadataType?.MetadataClassType.GetProperty(operand)?
+                    .GetCustomAttribute<NonSearchableAttribute>(inherit: true) != null;
+            }
+            
+            if(throwsException)
             {
                 throw new ArgumentException($"{operand} is not searchable");
             }

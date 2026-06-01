@@ -19,11 +19,10 @@ namespace QueryExpress.Web.Api.Controllers
             this.testDataContext = testDataContext;
         }
 
-        [HttpGet]
-        [HttpPost]
+        [HttpGet, HttpPost]
         public async Task<ApiResponse<Person>> QueryPeople([FromBody] DataQuery dataQuery)
         {
-            IQueryable<Tests.Data.Models.Person> query = testDataContext.People.AsQueryable();
+            IQueryable<Tests.Data.Models.Person> query = testDataContext.People.AsQueryable().AsNoTracking();
 
             query = query
                 .QueryFilter(dataQuery.FilterData);

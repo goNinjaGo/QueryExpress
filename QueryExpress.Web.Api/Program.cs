@@ -76,12 +76,10 @@ namespace QueryExpress.Web.Api
 
         public static List<Person> SeedDataFromCsv()
         {
-            using (var reader = new StreamReader($"{Environment.CurrentDirectory}\\People.csv"))
-            using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
-            {
-                var records = csv.GetRecords<Person>();
-                return records.ToList();
-            }
+            using var reader = new StreamReader($"{Environment.CurrentDirectory}\\People.csv");
+            using var csv = new CsvReader(reader, CultureInfo.InvariantCulture);
+            var records = csv.GetRecords<Person>();
+            return records.ToList();
         }
     }
 }
