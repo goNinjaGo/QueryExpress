@@ -40,10 +40,7 @@ namespace QueryExpress.Web.Api
                 options.UseInMemoryDatabase("PeopleDb");
                 options.UseSeeding((ctx, _) =>
                 {
-                    SeedData(builder).ForEach(p =>
-                    {
-                        ctx.Set<Person>().Add(p);
-                    });
+                    ctx.Set<Person>().AddRange(SeedData(builder));
                     ctx.SaveChanges();
                 });
             });

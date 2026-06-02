@@ -162,15 +162,9 @@ namespace QueryExpress
                 _ => filter.Operation.ToString()
             };
 
-            var method = filter.IsCaseSensitive
+            var method = (filter.IsCaseSensitive
                 ? typeof(string).GetMethod(methodName, [typeof(string)])
-                : typeof(string).GetMethod(methodName, [typeof(string), typeof(StringComparison)]);
-
-            if (method == null)
-            {
-                throw new InvalidOperationException();
-            }
-
+                : typeof(string).GetMethod(methodName, [typeof(string), typeof(StringComparison)])) ?? throw new InvalidOperationException();
             var args = filter.IsCaseSensitive
                 ? new Expression[] { Expression.Constant(filter.Value, typeof(string)) }
                 : [Expression.Constant(filter.Value, typeof(string)), Expression.Constant(StringComparison.InvariantCultureIgnoreCase, typeof(StringComparison))];
@@ -183,15 +177,21 @@ namespace QueryExpress
             return Expression.Lambda<Func<T, bool>>(expression, param);
         }
 
-        private static Expression<Func<T, bool>> DateFilter<T>(Filter filter, ParameterExpression param, MemberExpression prop, Type propType)
+        private static Expression<Func<T, bool>> DateFilter<T>(Filter filter, ParameterExpression param, MemberExpression prop, Type propType) =>
+            CompareFilter<T>(filter, param, prop, propType, "date");
+
+        private static Expression<Func<T, bool>> NumericFilter<T>(Filter filter, ParameterExpression param, MemberExpression prop, Type propType) =>
+            CompareFilter<T>(filter, param, prop, propType, "number");
+
+        private static Expression<Func<T, bool>> CompareFilter<T>(Filter filter, ParameterExpression param, MemberExpression prop, Type propType, string type)
         {
             var converter = TypeDescriptor.GetConverter(propType);
-            var value = converter.ConvertFromString(filter.Value) ?? throw new ArgumentException("Value is not a valid date");
+            var value = converter.ConvertFromString(filter.Value) ?? throw new ArgumentException($"Value is not a valid {type}");
             var valueExpression = CreateValueExpression(value, prop.Type, propType);
 
             if (filter.Operation == Operation.Between)
             {
-                var secondaryValue = converter.ConvertFromString(filter.SecondaryValue!) ?? throw new ArgumentException("SecondaryValue is not a valid date");
+                var secondaryValue = converter.ConvertFromString(filter.SecondaryValue!) ?? throw new ArgumentException($"SecondaryValue is not a valid {type}");
                 if (((IComparable)secondaryValue).CompareTo(value) < 0)
                 {
                     return Expression.Lambda<Func<T, bool>>(Expression.Constant(true), param);
@@ -211,41 +211,7 @@ namespace QueryExpress
                 Operation.LessThanOrEqual => Expression.LessThanOrEqual(prop, valueExpression),
                 Operation.GreaterThan => Expression.GreaterThan(prop, valueExpression),
                 Operation.GreaterThanOrEqual => Expression.GreaterThanOrEqual(prop, valueExpression),
-                _ => throw new InvalidOperationException($"Operation {filter.Operation} is not valid for date type.")
-            };
-
-            return Expression.Lambda<Func<T, bool>>(comparison, param);
-        }
-
-        private static Expression<Func<T, bool>> NumericFilter<T>(Filter filter, ParameterExpression param, MemberExpression prop, Type propType)
-        {
-            var converter = TypeDescriptor.GetConverter(propType);
-            var value = converter.ConvertFromString(filter.Value) ?? throw new ArgumentException("Value is not a valid number");
-            var valueExpression = CreateValueExpression(value, prop.Type, propType);
-
-            if (filter.Operation == Operation.Between)
-            {
-                var secondaryValue = converter.ConvertFromString(filter.SecondaryValue!) ?? throw new ArgumentException("SecondaryValue is not a valid number");
-                if (((IComparable)secondaryValue).CompareTo(value) < 0)
-                {
-                    return Expression.Lambda<Func<T, bool>>(Expression.Constant(true), param);
-                }
-
-                var secondaryValueExpression = CreateValueExpression(secondaryValue, prop.Type, propType);
-                var greaterThanOrEqual = Expression.GreaterThanOrEqual(prop, valueExpression);
-                var lessThanOrEqual = Expression.LessThanOrEqual(prop, secondaryValueExpression);
-                return Expression.Lambda<Func<T, bool>>(Expression.AndAlso(greaterThanOrEqual, lessThanOrEqual), param);
-            }
-
-            var comparison = filter.Operation switch
-            {
-                Operation.Equals => Expression.Equal(prop, valueExpression),
-                Operation.NotEquals => Expression.NotEqual(prop, valueExpression),
-                Operation.LessThan => Expression.LessThan(prop, valueExpression),
-                Operation.LessThanOrEqual => Expression.LessThanOrEqual(prop, valueExpression),
-                Operation.GreaterThan => Expression.GreaterThan(prop, valueExpression),
-                Operation.GreaterThanOrEqual => Expression.GreaterThanOrEqual(prop, valueExpression),
-                _ => throw new InvalidOperationException($"Operation {filter.Operation} is not valid for numeric type.")
+                _ => throw new InvalidOperationException($"Operation {filter.Operation} is not valid for {type} type.")
             };
 
             return Expression.Lambda<Func<T, bool>>(comparison, param);
